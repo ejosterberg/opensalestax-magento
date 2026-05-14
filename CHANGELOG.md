@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-05-13
+
+### Added
+- Server-side URL revalidation backend model `EJOsterberg\OpenSalesTax\Model\Config\Backend\ApiUrl` for the `osstax/general/api_url` admin field. Closes the A05 carry-over from the v1.0 security audit — frontend `validate-url` is no longer the only defense.
+- New admin toggle `osstax/general/restrict_to_public_ips` (Stores → Configuration → Sales → Tax → OpenSalesTax → "Restrict Engine URL to Public IPs"). When enabled, URLs whose host resolves to an RFC 1918 / loopback / link-local / reserved IP range are rejected at save time. Closes the A10 carry-over.
+- Pure-PHP `EJOsterberg\OpenSalesTax\Model\Validator\ApiUrlValidator` with an injectable hostname resolver — fully unit-testable without a Magento bootstrap.
+- 21 new unit tests covering: empty value, malformed URL, scheme allowlist (rejects `ftp://`, `file://`), public-IP acceptance, RFC 1918 / loopback / link-local rejection under the flag, unresolvable host, and sibling-field reading from the admin form submission.
+
+### Security
+- v1.0 audit carry-overs A05 (backend URL revalidation) and A10 (private-IP allowlist) resolved.
+- Default behavior unchanged: `restrict_to_public_ips` defaults to **No** so merchants who self-host OST on the same VM as Magento (constitution §2's reference deployment) keep working without configuration changes.
+- Documented caveat: this is save-time validation, not request-time. DNS rebinding is not mitigated — a host that resolves public at save time but private at request time can still slip through. A full mitigation would pin the resolved IP at save time; queued for v1.2 as the SonarQube dashboard tracker rolls over.
+- SonarQube re-scan: 0 open issues across BLOCKER / CRITICAL / MAJOR / MINOR. Security rating A. `composer audit`: 0 advisories.
+
 ## [1.0.0] - 2026-05-13
 
 ### Added
@@ -50,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Decrypted in memory only at request time, never logged.
 - Customer addresses and full payloads excluded from log statements.
 
-[Unreleased]: https://github.com/ejosterberg/opensalestax-magento/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/ejosterberg/opensalestax-magento/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/ejosterberg/opensalestax-magento/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/ejosterberg/opensalestax-magento/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/ejosterberg/opensalestax-magento/releases/tag/v0.1.0

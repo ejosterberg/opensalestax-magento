@@ -23,17 +23,22 @@ After the demo lands, update `specs/current-state.md` and tick off D2-D7 in the 
 
 If not done at stage 07: open <https://packagist.org/packages/submit> in a logged-in browser, paste `https://github.com/ejosterberg/opensalestax-magento`, click Submit. Configure the GitHub webhook so future tags auto-publish. Verify with `composer require ejosterberg/module-opensalestax --dry-run` on a clean Magento install.
 
-### 3. v0.2 polish queue (was v1.0 deferred)
+### 3. v1.2 polish queue (was v1.1 deferred)
 
 In priority order:
 
-- **Backend re-validation of `osstax/general/api_url`** (audit A05 carry-over). Currently only frontend `validate-url` runs. Add a custom backend_model that re-parses, applies scheme allowlist, and optionally a private-IP allowlist toggle.
+- **DNS-rebinding mitigation for the engine URL** (v1.1 carry-over). v1.1 added save-time IP validation. v1.2 should pin the resolved IP at save time and force the runtime cURL client to dial that IP. See `specs/security/audit-2026-05-13-v1.1.md` "Caveats documented for v1.2."
 - **PHP 8.3 support**. Blocked on `magento/magento-coding-standard` releasing a version that supports 8.3. Re-add to the CI matrix once the dep is bumped.
 - **Tax-class → OST-category mapping**. Currently every line is sent as category `general`. Match the WooCom v0.3.3 / Odoo v0.1.13 pattern: admin UI maps Magento tax classes to OST categories.
 - **Per-state nexus filter** (matches Odoo v0.3.0). Only call the engine for states where the merchant has nexus.
 - **Operator telemetry**. Last successful calc, failure streak, threshold-crossing alert via Magento's system message framework.
 - **Customer-group exemption-certificate hooks**. Magento has a built-in customer-group → tax-class mapping; expose an opt-out flag per group.
 - **MFTF end-to-end test suite**. Heavyweight; deferred from v1.0 because the demo deployment covers the happy path.
+
+### v1.1 shipped (security carry-overs closed)
+
+- **A05 — Backend URL revalidation**: server-side `parse_url` + scheme allowlist in `Model\Config\Backend\ApiUrl` + `Model\Validator\ApiUrlValidator`. Done in v1.1.0.
+- **A10 — Private-IP allowlist toggle**: new admin field `osstax/general/restrict_to_public_ips` (default off; opt-in defense-in-depth). Done in v1.1.0.
 
 ### 4. Magento Marketplace submission (v1.1)
 

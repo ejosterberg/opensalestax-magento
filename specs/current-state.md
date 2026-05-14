@@ -1,7 +1,7 @@
 # Current State — opensalestax-magento
 
-**Last updated:** 2026-05-13 (v1.0.0 shipped)
-**Status:** **v1.0.0 released.** Composer-installable Magento 2 module wired against the OpenSalesTax engine. Unit-tested (33 tests, all green on PHP 8.1 + 8.2 CI matrix). SonarQube clean (0 BLOCKER / 0 CRITICAL / 0 MAJOR; A across all ratings). One follow-up gating Packagist auto-publish + Marketplace polish queued for v1.1.
+**Last updated:** 2026-05-13 (v1.1.0 shipped)
+**Status:** **v1.1.0 released.** Composer-installable Magento 2 module wired against the OpenSalesTax engine. Unit-tested (54 tests, all green on PHP 8.1 + 8.2 CI matrix). SonarQube clean (0 open issues across every severity; A across all ratings). v1.1 closed the two v1.0 security carry-overs: server-side URL revalidation and an opt-in private-IP allowlist toggle.
 
 ## What's shipped
 
@@ -15,6 +15,13 @@ Initial installable release: HTTP client, the two plugins, admin config, ADR-001
 - `OstaxResponse::fromArray` refactor → cognitive complexity 16 → ≤10.
 - Full SonarQube clean: zero open issues across all severities; security rating A.
 - Demo VM provisioned (`magento-demo`, VMID 914, 10.32.161.183) — Magento bootstrap deferred to v1.1 pending Marketplace credentials.
+
+### v1.1.0 (2026-05-13) — security hardening
+
+- Backend URL revalidation: `Model\Config\Backend\ApiUrl` + `Model\Validator\ApiUrlValidator` apply server-side scheme allowlist + URL parse on save.
+- New admin toggle `osstax/general/restrict_to_public_ips` (default off): when enabled, rejects engine URLs that resolve to RFC1918 / loopback / link-local / reserved IPs.
+- Closes the two v1.0 audit carry-overs (A05, A10). Documented in `specs/security/audit-2026-05-13-v1.1.md`.
+- 54 unit tests (up from 33). NCLOC 590 → 695.
 
 ## Where the upstream engine is
 
@@ -35,6 +42,7 @@ Magento 2 `^2.4.6`. Adobe's lifecycle policy keeps 2.4.6 + 2.4.7 supported throu
 | `specs/decisions/001-tax-extension-point.md` | ADR — plugin on `Calculation::getRate` vs preference on `TaxCalculationInterface` |
 | `specs/security/audit-2026-05-13.md` | Stage 04 initial security audit (raised 1 CRITICAL + 8 MAJOR) |
 | `specs/security/audit-2026-05-13-followup.md` | Stage 06 follow-up audit (0 open after refactor) |
+| `specs/security/audit-2026-05-13-v1.1.md` | v1.1 audit (A05 + A10 carry-overs closed) |
 | `specs/demo-deployment.md` | Stage 05 status — VM up, Magento bootstrap blocked on Marketplace credentials |
 
 ## Distribution
