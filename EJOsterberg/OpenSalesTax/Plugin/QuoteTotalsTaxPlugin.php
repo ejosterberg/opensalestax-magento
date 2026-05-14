@@ -34,7 +34,7 @@ use RuntimeException;
  *  - `osstax/general/fail_hard=1` opts into rethrow → Magento surfaces a
  *    checkout exception, blocking the flow.
  */
-final class QuoteTotalsTaxPlugin
+class QuoteTotalsTaxPlugin
 {
     private const COUNTRY_US = 'US';
     private const CURRENCY_USD = 'USD';

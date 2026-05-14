@@ -16,7 +16,7 @@ namespace EJOsterberg\OpenSalesTax\Model;
  * Magento DI defaults classes to singleton scope per request, so this
  * naturally lives for one HTTP request and is discarded after.
  */
-final class QuoteTaxRegistry
+class QuoteTaxRegistry
 {
     /** @var array<int, OstaxResponse> */
     private array $responsesByQuoteId = [];

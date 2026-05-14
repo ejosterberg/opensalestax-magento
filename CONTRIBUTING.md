@@ -40,7 +40,7 @@ PRs that fail CI cannot merge.
 - `declare(strict_types=1);` at the top of every PHP file
 - SPDX header (`// SPDX-License-Identifier: Apache-2.0` for PHP, `<!-- SPDX-License-Identifier: Apache-2.0 -->` for XML) on every new file
 - PHPDoc on every public method
-- `final` on plugin classes
+- No `final` on production classes — the Magento2 coding standard disallows it everywhere (it breaks plugins and proxies)
 - No `mixed` return types without an inline justification
 
 ## Reporting bugs

@@ -23,7 +23,7 @@ use Magento\Framework\DataObject;
  * outside a totals collection — e.g., an admin rate-table preview), the
  * original Magento rate flows through unchanged.
  */
-final class CalculationPlugin
+class CalculationPlugin
 {
     public function __construct(
         private readonly QuoteTaxRegistry $registry

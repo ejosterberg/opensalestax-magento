@@ -29,7 +29,7 @@ namespace EJOsterberg\OpenSalesTax\Model;
  * }
  * ```
  */
-final class OstaxResponse
+class OstaxResponse
 {
     /**
      * @param array<string, array{tax: float, rate: float, jurisdictions: array<int, array{name: string, rate: float, tax: float}>}> $lineTaxes

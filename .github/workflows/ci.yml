@@ -39,7 +39,7 @@ jobs:
         run: vendor/bin/phpstan analyse --no-progress
 
       - name: PHPCS (Magento2 standard)
-        run: vendor/bin/phpcs --standard=Magento2 EJOsterberg/
+        run: vendor/bin/phpcs --runtime-set installed_paths vendor/magento/magento-coding-standard,vendor/phpcompatibility/php-compatibility,vendor/phpcsstandards/phpcsutils
 
       - name: Composer audit
         run: composer audit --no-dev || true
