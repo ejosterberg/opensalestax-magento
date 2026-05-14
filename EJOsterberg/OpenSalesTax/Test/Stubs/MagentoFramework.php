@@ -174,6 +174,22 @@ namespace Magento\Store\Model {
     }
 }
 
+namespace Magento\Framework\App\Config\Storage {
+    if (!interface_exists(__NAMESPACE__ . '\\WriterInterface', false)) {
+        /**
+         * Stub of Magento's config writer. Real implementation persists to
+         * `core_config_data`; our backend_model uses save() to pin the resolved
+         * IP and delete() to clear it.
+         */
+        interface WriterInterface
+        {
+            public function save(string $path, string $value, string $scope = 'default', int $scopeId = 0): void;
+
+            public function delete(string $path, string $scope = 'default', int $scopeId = 0): void;
+        }
+    }
+}
+
 namespace Magento\Framework\App\Config {
     if (!class_exists(__NAMESPACE__ . '\\Value', false)) {
         /**
@@ -229,6 +245,33 @@ namespace Magento\Framework\App\Config {
 
             public function beforeSave(): self
             {
+                return $this;
+            }
+
+            public function afterSave(): self
+            {
+                return $this;
+            }
+
+            public function getScope(): string
+            {
+                return (string)($this->_data['scope'] ?? 'default');
+            }
+
+            public function getScopeId(): int
+            {
+                return (int)($this->_data['scope_id'] ?? 0);
+            }
+
+            public function setScope(string $scope): self
+            {
+                $this->_data['scope'] = $scope;
+                return $this;
+            }
+
+            public function setScopeId(int $scopeId): self
+            {
+                $this->_data['scope_id'] = $scopeId;
                 return $this;
             }
         }

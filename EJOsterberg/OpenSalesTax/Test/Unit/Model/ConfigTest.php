@@ -97,4 +97,26 @@ final class ConfigTest extends TestCase
 
         self::assertTrue($config->isRestrictToPublicIps());
     }
+
+    public function testGetPinnedIpReturnsStoredValue(): void
+    {
+        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
+        $scopeConfig->method('getValue')
+            ->with(Config::PATH_PINNED_IP)
+            ->willReturn('8.8.8.8');
+
+        $config = new Config($scopeConfig, $this->createMock(EncryptorInterface::class));
+
+        self::assertSame('8.8.8.8', $config->getPinnedIp());
+    }
+
+    public function testGetPinnedIpReturnsEmptyStringWhenUnset(): void
+    {
+        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
+        $scopeConfig->method('getValue')->willReturn(null);
+
+        $config = new Config($scopeConfig, $this->createMock(EncryptorInterface::class));
+
+        self::assertSame('', $config->getPinnedIp());
+    }
 }

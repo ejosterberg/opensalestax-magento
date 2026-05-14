@@ -10,31 +10,25 @@ use PHPUnit\Framework\TestCase;
 
 final class ApiUrlValidatorTest extends TestCase
 {
-    public function testEmptyValueIsAllowed(): void
+    public function testEmptyValueReturnsNull(): void
     {
         $validator = new ApiUrlValidator(false);
 
-        $validator->validate('');
-
-        $this->expectNotToPerformAssertions();
+        self::assertNull($validator->validate(''));
     }
 
-    public function testValidHttpsUrlIsAccepted(): void
+    public function testValidHttpsUrlWithRestrictOffReturnsNull(): void
     {
         $validator = new ApiUrlValidator(false);
 
-        $validator->validate('https://ost.example.com');
-
-        $this->expectNotToPerformAssertions();
+        self::assertNull($validator->validate('https://ost.example.com'));
     }
 
-    public function testValidHttpUrlIsAccepted(): void
+    public function testValidHttpUrlWithRestrictOffReturnsNull(): void
     {
         $validator = new ApiUrlValidator(false);
 
-        $validator->validate('http://ost.example.com:8080');
-
-        $this->expectNotToPerformAssertions();
+        self::assertNull($validator->validate('http://ost.example.com:8080'));
     }
 
     public function testMalformedUrlIsRejected(): void
@@ -71,27 +65,23 @@ final class ApiUrlValidatorTest extends TestCase
         $validator->validate('file:///etc/passwd');
     }
 
-    public function testWithRestrictOffPrivateIpsAreAllowed(): void
+    public function testWithRestrictOffPrivateIpsAreAllowedAndReturnNull(): void
     {
         $validator = new ApiUrlValidator(false);
 
-        $validator->validate('http://192.168.1.100:8080');
-        $validator->validate('http://10.0.0.1:8080');
-        $validator->validate('http://127.0.0.1:8080');
-
-        $this->expectNotToPerformAssertions();
+        self::assertNull($validator->validate('http://192.168.1.100:8080'));
+        self::assertNull($validator->validate('http://10.0.0.1:8080'));
+        self::assertNull($validator->validate('http://127.0.0.1:8080'));
     }
 
-    public function testWithRestrictOnPublicIpIsAccepted(): void
+    public function testWithRestrictOnPublicIpIsAcceptedAndReturnedForPinning(): void
     {
         $validator = new ApiUrlValidator(
             restrictToPublicIps: true,
             hostResolver: static fn(string $host): string => '8.8.8.8'
         );
 
-        $validator->validate('https://ost.example.com');
-
-        $this->expectNotToPerformAssertions();
+        self::assertSame('8.8.8.8', $validator->validate('https://ost.example.com'));
     }
 
     public function testWithRestrictOnRfc1918IpIsRejected(): void

@@ -26,8 +26,8 @@
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
                 <field id="restrict_to_public_ips" translate="label comment" type="select" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
-                    <label>Restrict Engine URL to Public IPs</label>
-                    <comment>If Yes, the Engine API URL must resolve to a public IP at save time. Useful when the engine runs on a separate host. If No (default), localhost / RFC1918 / link-local hosts are permitted — the supported pattern when Magento and OST run on the same VM.</comment>
+                    <label>Restrict and Pin Engine URL</label>
+                    <comment><![CDATA[If Yes, two defenses activate. At save time, the Engine API URL must resolve to a public IP — RFC 1918 / loopback / link-local / reserved ranges are rejected. The resolved IP is then <b>pinned</b>: subsequent engine calls dial that IP via cURL <code>CURLOPT_RESOLVE</code> regardless of what DNS returns, defending against DNS rebinding. If your engine's IP rotates, you must re-save the URL to refresh the pin. If No (default), localhost / RFC1918 / link-local hosts are permitted — the supported pattern when Magento and OST run on the same VM.]]></comment>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
             </group>

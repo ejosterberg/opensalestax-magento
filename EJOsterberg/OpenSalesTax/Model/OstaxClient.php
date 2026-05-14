@@ -133,7 +133,14 @@ class OstaxClient
     }
 
     /**
-     * Apply headers + timeout to the Curl instance. Called before every request.
+     * Apply headers + timeout + pinned-IP resolution to the Curl instance.
+     * Called before every request.
+     *
+     * When the admin's `restrict_to_public_ips` toggle is on, the backend_model
+     * pins the resolved IP at save time. Here we honor that pin via
+     * `CURLOPT_RESOLVE` so the runtime cURL connection bypasses DNS entirely —
+     * defends against DNS rebinding (host resolves public at save time, then
+     * to an internal IP at request time).
      */
     private function configureCurl(): void
     {
@@ -144,6 +151,26 @@ class OstaxClient
         }
         $this->curl->setHeaders($headers);
         $this->curl->setTimeout(self::DEFAULT_TIMEOUT_SECONDS);
+        $this->applyPinnedIp();
+    }
+
+    /**
+     * Pass `CURLOPT_RESOLVE` when a pinned IP is configured, so cURL dials
+     * that IP regardless of what DNS currently returns. No-op when the pin
+     * is unset (admin has `restrict_to_public_ips` off — normal DNS).
+     */
+    private function applyPinnedIp(): void
+    {
+        $pinnedIp = $this->config->getPinnedIp();
+        if ($pinnedIp === '') {
+            return;
+        }
+        $parts = parse_url($this->config->getApiUrl());
+        if ($parts === false || !isset($parts['scheme'], $parts['host'])) {
+            return;
+        }
+        $port = $parts['port'] ?? ($parts['scheme'] === 'https' ? 443 : 80);
+        $this->curl->setOption(CURLOPT_RESOLVE, [sprintf('%s:%d:%s', $parts['host'], $port, $pinnedIp)]);
     }
 
     private function requireApiUrl(): string

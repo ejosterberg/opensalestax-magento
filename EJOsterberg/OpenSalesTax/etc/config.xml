@@ -9,6 +9,7 @@
                 <api_token/>
                 <fail_hard>0</fail_hard>
                 <restrict_to_public_ips>0</restrict_to_public_ips>
+                <api_url_pinned_ip/>
             </general>
         </osstax>
     </default>

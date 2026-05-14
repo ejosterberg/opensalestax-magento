@@ -21,6 +21,7 @@ class Config
     public const PATH_API_TOKEN = 'osstax/general/api_token';
     public const PATH_FAIL_HARD = 'osstax/general/fail_hard';
     public const PATH_RESTRICT_TO_PUBLIC_IPS = 'osstax/general/restrict_to_public_ips';
+    public const PATH_PINNED_IP = 'osstax/general/api_url_pinned_ip';
 
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
@@ -95,5 +96,20 @@ class Config
             ScopeInterface::SCOPE_STORE,
             $scopeCode
         );
+    }
+
+    /**
+     * Returns the pinned IP the backend_model captured at save time, or empty
+     * string if no pin is in place. Used by `OstaxClient` to force `CURLOPT_RESOLVE`
+     * so the runtime cURL connection bypasses DNS — defends against DNS rebinding.
+     */
+    public function getPinnedIp(?string $scopeCode = null): string
+    {
+        $raw = $this->scopeConfig->getValue(
+            self::PATH_PINNED_IP,
+            ScopeInterface::SCOPE_STORE,
+            $scopeCode
+        );
+        return is_string($raw) ? $raw : '';
     }
 }

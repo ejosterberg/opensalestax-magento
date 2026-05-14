@@ -98,6 +98,72 @@ final class OstaxClientTest extends TestCase
         self::assertSame('Bearer secret-token', $capturedHeaders['Authorization']);
     }
 
+    public function testCalculateSetsCurlResolveWhenPinnedIpConfigured(): void
+    {
+        $curl = $this->createMock(Curl::class);
+        $curl->method('getStatus')->willReturn(200);
+        $curl->method('getBody')->willReturn('{"tax_total": 0, "lines": []}');
+
+        $capturedResolve = null;
+        $curl->method('setOption')
+            ->willReturnCallback(function (int $opt, $value) use (&$capturedResolve) {
+                if ($opt === CURLOPT_RESOLVE) {
+                    $capturedResolve = $value;
+                }
+            });
+
+        $config = $this->configMock('https://ost.example.com:443', '', '203.0.113.10');
+
+        $client = new OstaxClient($curl, new Json(), $config, $this->createMock(LoggerInterface::class));
+        $client->calculate(['lines' => []]);
+
+        self::assertIsArray($capturedResolve);
+        self::assertSame(['ost.example.com:443:203.0.113.10'], $capturedResolve);
+    }
+
+    public function testCalculateDoesNotSetCurlResolveWhenPinnedIpEmpty(): void
+    {
+        $curl = $this->createMock(Curl::class);
+        $curl->method('getStatus')->willReturn(200);
+        $curl->method('getBody')->willReturn('{"tax_total": 0, "lines": []}');
+
+        $resolveWasSet = false;
+        $curl->method('setOption')->willReturnCallback(function (int $opt) use (&$resolveWasSet) {
+            if ($opt === CURLOPT_RESOLVE) {
+                $resolveWasSet = true;
+            }
+        });
+
+        $config = $this->configMock('https://ost.example.com', '', '');
+
+        $client = new OstaxClient($curl, new Json(), $config, $this->createMock(LoggerInterface::class));
+        $client->calculate(['lines' => []]);
+
+        self::assertFalse($resolveWasSet, 'CURLOPT_RESOLVE should not be set when no pinned IP is configured.');
+    }
+
+    public function testCalculateDefaultsHttpsTo443AndHttpTo80(): void
+    {
+        $captured = [];
+        for ($i = 0; $i < 2; $i++) {
+            $curl = $this->createMock(Curl::class);
+            $curl->method('getStatus')->willReturn(200);
+            $curl->method('getBody')->willReturn('{"tax_total": 0, "lines": []}');
+            $curl->method('setOption')->willReturnCallback(function (int $opt, $value) use (&$captured, $i) {
+                if ($opt === CURLOPT_RESOLVE) {
+                    $captured[$i] = $value;
+                }
+            });
+            $url = $i === 0 ? 'https://ost.example.com' : 'http://ost.example.com';
+            $config = $this->configMock($url, '', '203.0.113.10');
+            $client = new OstaxClient($curl, new Json(), $config, $this->createMock(LoggerInterface::class));
+            $client->calculate(['lines' => []]);
+        }
+
+        self::assertSame(['ost.example.com:443:203.0.113.10'], $captured[0]);
+        self::assertSame(['ost.example.com:80:203.0.113.10'], $captured[1]);
+    }
+
     public function testHealthCheckHappyPath(): void
     {
         $curl = $this->createMock(Curl::class);
@@ -148,14 +214,17 @@ final class OstaxClientTest extends TestCase
     }
 
     /**
-     * Lightweight Config stub since Config itself is `final` (cannot be mocked
-     * with createMock) and Magento's encryptor mock is heavy.
+     * Lightweight Config stub. Magento's encryptor mock is heavy, so we
+     * extend Config directly and stub the few methods OstaxClient touches.
      */
-    private function configMock(string $apiUrl, string $apiToken): Config
+    private function configMock(string $apiUrl, string $apiToken, string $pinnedIp = ''): Config
     {
-        return new class ($apiUrl, $apiToken) extends Config {
-            public function __construct(private string $apiUrl, private string $apiToken)
-            {
+        return new class ($apiUrl, $apiToken, $pinnedIp) extends Config {
+            public function __construct(
+                private string $apiUrl,
+                private string $apiToken,
+                private string $pinnedIp = ''
+            ) {
             }
 
             public function getApiUrl(?string $scopeCode = null): string
@@ -166,6 +235,11 @@ final class OstaxClientTest extends TestCase
             public function getApiToken(?string $scopeCode = null): string
             {
                 return $this->apiToken;
+            }
+
+            public function getPinnedIp(?string $scopeCode = null): string
+            {
+                return $this->pinnedIp;
             }
 
             public function isFailHard(?string $scopeCode = null): bool

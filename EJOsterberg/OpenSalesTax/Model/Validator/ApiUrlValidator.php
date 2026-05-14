@@ -18,16 +18,12 @@ use InvalidArgumentException;
  *
  * The optional check is opt-in (defaults to off) because the supported
  * deployment pattern is merchant-self-hosted OST on the same VM as Magento
- * (often `http://10.x.x.x:8080` or `http://localhost:8080`). Merchants who
- * point at an external engine and want defense-in-depth against an admin
- * pasting an arbitrary URL enable the flag.
+ * (often `http://10.x.x.x:8080` or `http://localhost:8080`).
  *
- * **Caveats** (documented for `specs/security/`):
- *  - DNS rebinding is NOT prevented. Save-time IP resolution can return a
- *    public address while request-time resolution returns a private one.
- *    A full mitigation would require pinning the resolved IP, which is out
- *    of scope for v1.1.
- *  - Empty value is considered valid; that is the "module disabled" state.
+ * **Return value:** `validate()` returns the resolved IP when the
+ * restrict-to-public-IPs flag is on (so the backend_model can pin it for
+ * DNS-rebinding defense), or `null` otherwise. Empty input also returns
+ * null.
  */
 class ApiUrlValidator
 {
@@ -54,11 +50,15 @@ class ApiUrlValidator
     /**
      * @throws InvalidArgumentException with a human-readable message. The
      *     backend_model translates this to a Magento LocalizedException.
+     * @return string|null The resolved IP to pin (when restrict-to-public-IPs
+     *     is on and validation succeeds), or null when no pin is required
+     *     (empty input, or restrict-to-public-IPs is off — the runtime cURL
+     *     client uses normal DNS in that case).
      */
-    public function validate(string $url): void
+    public function validate(string $url): ?string
     {
         if ($url === '') {
-            return;
+            return null;
         }
 
         $parts = parse_url($url);
@@ -74,16 +74,21 @@ class ApiUrlValidator
             );
         }
 
-        if ($this->restrictToPublicIps) {
-            $this->validatePublicHost($parts['host']);
+        if (!$this->restrictToPublicIps) {
+            return null;
         }
+
+        return $this->resolveAndCheckPublic($parts['host']);
     }
 
     /**
+     * Resolve the host and verify it is a public, non-reserved IP. Returns the IP
+     * so the caller can pin it.
+     *
      * @throws InvalidArgumentException When the host fails to resolve or
      *     resolves to a private / reserved IP.
      */
-    private function validatePublicHost(string $host): void
+    private function resolveAndCheckPublic(string $host): string
     {
         $ip = ($this->hostResolver)($host);
         if ($ip === null) {
@@ -101,5 +106,6 @@ class ApiUrlValidator
                 'The Engine API URL must resolve to a public IP when "Restrict to public IPs" is enabled.'
             );
         }
+        return $ip;
     }
 }
