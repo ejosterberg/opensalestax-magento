@@ -1,0 +1,14 @@
+includes:
+    - vendor/bitexpert/phpstan-magento/extension.neon
+
+parameters:
+    level: 8
+    paths:
+        - EJOsterberg/OpenSalesTax
+    excludePaths:
+        - EJOsterberg/OpenSalesTax/Test
+        - EJOsterberg/OpenSalesTax/registration.php
+    ignoreErrors:
+        # Magento's DataObject magic methods (getCountryId, getQuote, etc.) are
+        # not statically typed; treat them as mixed where used in plugins.
+        - '#Call to an undefined method Magento\\Framework\\DataObject::#'

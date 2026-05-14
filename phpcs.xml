@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<ruleset name="opensalestax-magento">
+    <description>Magento 2 coding standard for the OpenSalesTax module</description>
+
+    <rule ref="Magento2"/>
+
+    <file>EJOsterberg/OpenSalesTax</file>
+
+    <exclude-pattern>*/Test/Unit/*</exclude-pattern>
+    <exclude-pattern>*/vendor/*</exclude-pattern>
+</ruleset>
