@@ -1,0 +1,16 @@
+<?php
+// SPDX-License-Identifier: Apache-2.0
+/**
+ * Magento module registration for EJOsterberg_OpenSalesTax.
+ *
+ * Invoked by Magento's autoloader at framework bootstrap time. Registers
+ * this directory as a Magento component so `bin/magento module:enable
+ * EJOsterberg_OpenSalesTax` resolves.
+ */
+declare(strict_types=1);
+
+\Magento\Framework\Component\ComponentRegistrar::register(
+    \Magento\Framework\Component\ComponentRegistrar::MODULE,
+    'EJOsterberg_OpenSalesTax',
+    __DIR__
+);

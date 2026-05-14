@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
+    <system>
+        <section id="osstax" translate="label" sortOrder="200" showInDefault="1" showInWebsite="1" showInStore="1">
+            <label>OpenSalesTax</label>
+            <tab>sales</tab>
+            <resource>EJOsterberg_OpenSalesTax::config</resource>
+            <group id="general" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>General</label>
+                <field id="api_url" translate="label comment" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Engine API URL</label>
+                    <comment>Base URL of your self-hosted OpenSalesTax engine, e.g. https://ost.example.com</comment>
+                    <validate>validate-url</validate>
+                </field>
+                <field id="api_token" translate="label comment" type="obscure" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>API Token (optional)</label>
+                    <comment>Bearer token if your engine instance requires authentication. Stored encrypted.</comment>
+                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                </field>
+                <field id="fail_hard" translate="label comment" type="select" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Fail Hard on Engine Error</label>
+                    <comment>If Yes, an unreachable engine blocks checkout. If No (default), the module falls back to Magento's built-in tax tables and logs a warning.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+            </group>
+        </section>
+    </system>
+</config>

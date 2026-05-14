@@ -1,0 +1,26 @@
+{
+    "name": "ejosterberg/module-opensalestax",
+    "description": "Magento 2 module — destination-based US sales tax via the self-hosted OpenSalesTax engine",
+    "type": "magento2-module",
+    "license": "Apache-2.0",
+    "authors": [
+        {
+            "name": "Eric Osterberg",
+            "email": "ejosterberg@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "magento/framework": "^103.0",
+        "magento/module-tax": "^100.4 || ^101.0",
+        "magento/module-quote": "^101.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "EJOsterberg\\OpenSalesTax\\": ""
+        },
+        "files": [
+            "registration.php"
+        ]
+    }
+}

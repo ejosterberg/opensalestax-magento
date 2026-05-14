@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+
+    <!--
+        Per ADR-001: plugin on Magento\Tax\Model\Calculation::getRate (pattern B).
+        afterGetRate reads from the request-scoped QuoteTaxRegistry that the
+        totals plugin pre-warms with the OST engine response.
+    -->
+    <type name="Magento\Tax\Model\Calculation">
+        <plugin name="ejosterberg_opensalestax_calculation"
+                type="EJOsterberg\OpenSalesTax\Plugin\CalculationPlugin"
+                sortOrder="10"
+                disabled="false"/>
+    </type>
+
+    <!--
+        Totals collector plugin: pre-warms the registry in beforeCollect,
+        writes the per-jurisdiction breakdown in afterCollect.
+    -->
+    <type name="Magento\Quote\Model\Quote\Address\Total\Tax">
+        <plugin name="ejosterberg_opensalestax_quote_totals_tax"
+                type="EJOsterberg\OpenSalesTax\Plugin\QuoteTotalsTaxPlugin"
+                sortOrder="10"
+                disabled="false"/>
+    </type>
+
+</config>

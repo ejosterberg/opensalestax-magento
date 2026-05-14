@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+    <default>
+        <osstax>
+            <general>
+                <api_url/>
+                <api_token/>
+                <fail_hard>0</fail_hard>
+            </general>
+        </osstax>
+    </default>
+</config>
