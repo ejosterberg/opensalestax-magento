@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-05-13
+
+### Added
+- Typed exception hierarchy under `EJOsterberg\OpenSalesTax\Exception\`: `OstaxEngineException` (base), `OstaxEngineUnreachableException`, `OstaxMalformedResponseException`, `OstaxNotConfiguredException`. Replaces generic `RuntimeException` so callers can discriminate failure modes for logging and fail-soft / fail-hard policy.
+- `specs/security/audit-2026-05-13-followup.md` capturing the second-pass SonarQube scan — 0 open issues.
+- `specs/demo-deployment.md` documenting the demo VM (914 / 10.32.161.183) and the manual Magento bootstrap steps Eric runs once Marketplace credentials are available.
+
+### Changed
+- `OstaxResponse::fromArray` refactored from one 30-line nested method into `fromArray` + `parseLines` + `parseLine` + `parseJurisdictions`. Cognitive complexity dropped from 16 to ≤10 (closes SonarQube `php:S3776` CRITICAL).
+- `OstaxClient::healthCheck` extracted a `healthFailure` helper for the failure-result shape.
+- `OstaxClient::calculate` now throws `OstaxEngineUnreachableException` / `OstaxMalformedResponseException` / `OstaxNotConfiguredException` instead of `RuntimeException` (closes SonarQube `php:S112` ×4 MAJOR).
+- `QuoteTotalsTaxPlugin::beforeCollect` fail-hard path now throws `OstaxEngineException`.
+
+### Security
+- SonarQube re-scan: 0 BLOCKER, 0 CRITICAL, 0 MAJOR, 0 MINOR, 0 unreviewed hotspots, security rating A.
+- `composer audit`: 0 advisories.
+- Full audit history committed in `specs/security/`.
+
+### Notes
+- The 4 `php:S1142` MAJOR findings (4-8 returns per method) on guard-clause methods were reviewed and marked **Won't Fix** in SonarQube with rationale: the early-return pattern is more readable than nested if/else for gate-style methods.
+- Demo-deployment criteria D2-D7 deferred to v1.1 pending Eric's Magento Marketplace credentials; the v1.0 release ships on the strength of unit tests + SonarQube clean + manual security review.
+
 ## [0.1.0] - 2026-05-13
 
 ### Added
@@ -28,5 +50,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Decrypted in memory only at request time, never logged.
 - Customer addresses and full payloads excluded from log statements.
 
-[Unreleased]: https://github.com/ejosterberg/opensalestax-magento/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/ejosterberg/opensalestax-magento/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/ejosterberg/opensalestax-magento/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/ejosterberg/opensalestax-magento/releases/tag/v0.1.0
