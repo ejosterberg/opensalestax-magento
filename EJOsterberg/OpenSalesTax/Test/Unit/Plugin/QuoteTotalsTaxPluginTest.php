@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace EJOsterberg\OpenSalesTax\Test\Unit\Plugin;
 
+use EJOsterberg\OpenSalesTax\Exception\OstaxEngineException;
 use EJOsterberg\OpenSalesTax\Model\Config;
 use EJOsterberg\OpenSalesTax\Model\OstaxClient;
 use EJOsterberg\OpenSalesTax\Model\OstaxResponse;
@@ -166,7 +167,7 @@ final class QuoteTotalsTaxPluginTest extends TestCase
             items: [['id' => '1', 'row_total' => 100.0, 'qty' => 1]],
         );
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(OstaxEngineException::class);
         $this->expectExceptionMessageMatches('/fail-hard/');
 
         $plugin->beforeCollect(new stdClass(), $shippingAssignment, $this->buildTotal());

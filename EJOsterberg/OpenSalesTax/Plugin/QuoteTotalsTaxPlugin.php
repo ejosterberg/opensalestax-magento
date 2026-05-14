@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace EJOsterberg\OpenSalesTax\Plugin;
 
+use EJOsterberg\OpenSalesTax\Exception\OstaxEngineException;
 use EJOsterberg\OpenSalesTax\Model\Config;
 use EJOsterberg\OpenSalesTax\Model\OstaxClient;
 use EJOsterberg\OpenSalesTax\Model\QuoteTaxRegistry;
 use Psr\Log\LoggerInterface;
-use RuntimeException;
 
 /**
  * Plugin on `Magento\Quote\Model\Quote\Address\Total\Tax::collect`.
@@ -102,7 +102,11 @@ class QuoteTotalsTaxPlugin
                 'fail_hard' => $this->config->isFailHard(),
             ]);
             if ($this->config->isFailHard()) {
-                throw new RuntimeException('OST engine unreachable; checkout blocked (fail-hard mode)', 0, $e);
+                throw new OstaxEngineException(
+                    'OST engine unreachable; checkout blocked (fail-hard mode)',
+                    0,
+                    $e
+                );
             }
         }
 

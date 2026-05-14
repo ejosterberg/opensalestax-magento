@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace EJOsterberg\OpenSalesTax\Test\Unit\Model;
 
+use EJOsterberg\OpenSalesTax\Exception\OstaxEngineUnreachableException;
+use EJOsterberg\OpenSalesTax\Exception\OstaxMalformedResponseException;
+use EJOsterberg\OpenSalesTax\Exception\OstaxNotConfiguredException;
 use EJOsterberg\OpenSalesTax\Model\Config;
 use EJOsterberg\OpenSalesTax\Model\OstaxClient;
 use Magento\Framework\HTTP\Client\Curl;
 use Magento\Framework\Serialize\Serializer\Json;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
-use RuntimeException;
 
 final class OstaxClientTest extends TestCase
 {
@@ -44,7 +46,7 @@ final class OstaxClientTest extends TestCase
 
         $client = new OstaxClient($curl, new Json(), $config, $this->createMock(LoggerInterface::class));
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(OstaxEngineUnreachableException::class);
         $this->expectExceptionMessageMatches('/HTTP 503/');
         $client->calculate(['lines' => []]);
     }
@@ -58,7 +60,7 @@ final class OstaxClientTest extends TestCase
 
         $client = new OstaxClient($curl, new Json(), $config, $this->createMock(LoggerInterface::class));
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(OstaxNotConfiguredException::class);
         $client->calculate(['lines' => []]);
     }
 
@@ -72,7 +74,7 @@ final class OstaxClientTest extends TestCase
 
         $client = new OstaxClient($curl, new Json(), $config, $this->createMock(LoggerInterface::class));
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(OstaxMalformedResponseException::class);
         $client->calculate([]);
     }
 

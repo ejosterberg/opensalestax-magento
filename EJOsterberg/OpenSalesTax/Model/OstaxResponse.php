@@ -43,47 +43,18 @@ class OstaxResponse
     }
 
     /**
-     * Build from a decoded JSON array. Validates required keys; throws on shape mismatch.
+     * Build from a decoded JSON array. Validates required keys; quietly skips
+     * lines that lack a line_id.
      *
      * @param array<string, mixed> $payload
      */
     public static function fromArray(array $payload): self
     {
-        $taxTotal = isset($payload['tax_total']) ? (float)$payload['tax_total'] : 0.0;
-        $shippingTax = isset($payload['shipping_tax']) ? (float)$payload['shipping_tax'] : 0.0;
-
-        $lineTaxes = [];
-        $rawLines = $payload['lines'] ?? [];
-        if (!is_array($rawLines)) {
-            $rawLines = [];
-        }
-        foreach ($rawLines as $line) {
-            if (!is_array($line) || !isset($line['line_id'])) {
-                continue;
-            }
-            $lineId = (string)$line['line_id'];
-            $jurisdictions = [];
-            $rawJurisdictions = $line['jurisdictions'] ?? [];
-            if (is_array($rawJurisdictions)) {
-                foreach ($rawJurisdictions as $jurisdiction) {
-                    if (!is_array($jurisdiction)) {
-                        continue;
-                    }
-                    $jurisdictions[] = [
-                        'name' => (string)($jurisdiction['name'] ?? ''),
-                        'rate' => (float)($jurisdiction['rate'] ?? 0.0),
-                        'tax'  => (float)($jurisdiction['tax'] ?? 0.0),
-                    ];
-                }
-            }
-            $lineTaxes[$lineId] = [
-                'tax'           => (float)($line['tax'] ?? 0.0),
-                'rate'          => (float)($line['rate'] ?? 0.0),
-                'jurisdictions' => $jurisdictions,
-            ];
-        }
-
-        return new self($taxTotal, $shippingTax, $lineTaxes);
+        return new self(
+            isset($payload['tax_total']) ? (float)$payload['tax_total'] : 0.0,
+            isset($payload['shipping_tax']) ? (float)$payload['shipping_tax'] : 0.0,
+            self::parseLines($payload['lines'] ?? [])
+        );
     }
 
     /**
@@ -99,5 +70,72 @@ class OstaxResponse
             return $line['rate'] * 100.0;
         }
         return 0.0;
+    }
+
+    /**
+     * Parse the top-level `lines` array. Each line is parsed by parseLine().
+     *
+     * @param mixed $rawLines
+     * @return array<string, array{tax: float, rate: float, jurisdictions: array<int, array{name: string, rate: float, tax: float}>}>
+     */
+    private static function parseLines($rawLines): array
+    {
+        if (!is_array($rawLines)) {
+            return [];
+        }
+        $lines = [];
+        foreach ($rawLines as $line) {
+            $parsed = self::parseLine($line);
+            if ($parsed !== null) {
+                $lines[$parsed['line_id']] = $parsed['entry'];
+            }
+        }
+        return $lines;
+    }
+
+    /**
+     * Parse a single line. Returns null when the line is malformed.
+     *
+     * @param mixed $line
+     * @return array{line_id: string, entry: array{tax: float, rate: float, jurisdictions: array<int, array{name: string, rate: float, tax: float}>}}|null
+     */
+    private static function parseLine($line): ?array
+    {
+        if (!is_array($line) || !isset($line['line_id'])) {
+            return null;
+        }
+        return [
+            'line_id' => (string)$line['line_id'],
+            'entry'   => [
+                'tax'           => (float)($line['tax'] ?? 0.0),
+                'rate'          => (float)($line['rate'] ?? 0.0),
+                'jurisdictions' => self::parseJurisdictions($line['jurisdictions'] ?? []),
+            ],
+        ];
+    }
+
+    /**
+     * Parse a line's jurisdictions list. Returns an empty array on malformed input.
+     *
+     * @param mixed $rawJurisdictions
+     * @return array<int, array{name: string, rate: float, tax: float}>
+     */
+    private static function parseJurisdictions($rawJurisdictions): array
+    {
+        if (!is_array($rawJurisdictions)) {
+            return [];
+        }
+        $jurisdictions = [];
+        foreach ($rawJurisdictions as $jurisdiction) {
+            if (!is_array($jurisdiction)) {
+                continue;
+            }
+            $jurisdictions[] = [
+                'name' => (string)($jurisdiction['name'] ?? ''),
+                'rate' => (float)($jurisdiction['rate'] ?? 0.0),
+                'tax'  => (float)($jurisdiction['tax'] ?? 0.0),
+            ];
+        }
+        return $jurisdictions;
     }
 }

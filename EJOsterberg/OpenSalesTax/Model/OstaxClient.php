@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace EJOsterberg\OpenSalesTax\Model;
 
+use EJOsterberg\OpenSalesTax\Exception\OstaxEngineUnreachableException;
+use EJOsterberg\OpenSalesTax\Exception\OstaxMalformedResponseException;
+use EJOsterberg\OpenSalesTax\Exception\OstaxNotConfiguredException;
 use Magento\Framework\HTTP\Client\Curl;
 use Magento\Framework\Serialize\Serializer\Json;
 use Psr\Log\LoggerInterface;
-use RuntimeException;
 
 /**
  * HTTP client for the OpenSalesTax engine v1 API.
@@ -19,9 +21,10 @@ use RuntimeException;
  * Authentication: if a token is configured, we send it as a Bearer header.
  * TLS verification is left at Curl defaults (peer-verify on).
  *
- * Failure model (constitution §8): this class throws on any non-2xx
- * response. The caller decides whether to fail-soft (catch + fall back to
- * Magento's built-in calc) or fail-hard (rethrow, block checkout).
+ * Failure model (constitution §8): this class throws typed exceptions on any
+ * non-2xx response or malformed body. The caller decides whether to
+ * fail-soft (catch + fall back to Magento's built-in calc) or fail-hard
+ * (rethrow, block checkout).
  *
  * Logging: only structured metadata (no full payloads — they carry
  * customer addresses). The api_token is never logged.
@@ -44,7 +47,9 @@ class OstaxClient
      * Call POST /v1/calculate. Returns the decoded response as a value object.
      *
      * @param array<string, mixed> $payload Engine-shaped request body.
-     * @throws RuntimeException When the engine is unreachable or returns non-200.
+     * @throws OstaxNotConfiguredException When `api_url` is empty.
+     * @throws OstaxEngineUnreachableException When the engine returns non-200.
+     * @throws OstaxMalformedResponseException When the engine returns a non-array body.
      */
     public function calculate(array $payload): OstaxResponse
     {
@@ -62,7 +67,7 @@ class OstaxClient
                 'http_status' => $status,
                 'rtt_ms'      => $rttMs,
             ]);
-            throw new RuntimeException(
+            throw new OstaxEngineUnreachableException(
                 sprintf('OST engine returned HTTP %d on /v1/calculate', $status)
             );
         }
@@ -73,7 +78,7 @@ class OstaxClient
                 'http_status' => $status,
                 'rtt_ms'      => $rttMs,
             ]);
-            throw new RuntimeException('OST engine returned malformed JSON body');
+            throw new OstaxMalformedResponseException('OST engine returned malformed JSON body');
         }
 
         $this->logger->info('opensalestax: engine /v1/calculate ok', [
@@ -94,13 +99,7 @@ class OstaxClient
     {
         $url = $this->config->getApiUrl();
         if ($url === '') {
-            return [
-                'ok'           => false,
-                'version'      => '',
-                'db_connected' => false,
-                'rtt_ms'       => 0,
-                'error'        => 'API URL is not configured',
-            ];
+            return $this->healthFailure(0, 'API URL is not configured');
         }
 
         $start = microtime(true);
@@ -108,36 +107,21 @@ class OstaxClient
             $this->configureCurl();
             $this->curl->get($url . self::ENDPOINT_HEALTH);
         } catch (\Throwable $e) {
-            return [
-                'ok'           => false,
-                'version'      => '',
-                'db_connected' => false,
-                'rtt_ms'       => (int)round((microtime(true) - $start) * 1000),
-                'error'        => 'transport error',
-            ];
+            return $this->healthFailure(
+                (int)round((microtime(true) - $start) * 1000),
+                'transport error'
+            );
         }
 
         $rttMs = (int)round((microtime(true) - $start) * 1000);
         $status = $this->curl->getStatus();
         if ($status !== 200) {
-            return [
-                'ok'           => false,
-                'version'      => '',
-                'db_connected' => false,
-                'rtt_ms'       => $rttMs,
-                'error'        => sprintf('HTTP %d', $status),
-            ];
+            return $this->healthFailure($rttMs, sprintf('HTTP %d', $status));
         }
 
         $decoded = $this->json->unserialize($this->curl->getBody());
         if (!is_array($decoded)) {
-            return [
-                'ok'           => false,
-                'version'      => '',
-                'db_connected' => false,
-                'rtt_ms'       => $rttMs,
-                'error'        => 'malformed JSON',
-            ];
+            return $this->healthFailure($rttMs, 'malformed JSON');
         }
 
         return [
@@ -166,8 +150,24 @@ class OstaxClient
     {
         $url = $this->config->getApiUrl();
         if ($url === '') {
-            throw new RuntimeException('OST engine API URL is not configured');
+            throw new OstaxNotConfiguredException('OST engine API URL is not configured');
         }
         return $url;
+    }
+
+    /**
+     * Shape a healthCheck() failure result.
+     *
+     * @return array{ok: bool, version: string, db_connected: bool, rtt_ms: int, error: string}
+     */
+    private function healthFailure(int $rttMs, string $error): array
+    {
+        return [
+            'ok'           => false,
+            'version'      => '',
+            'db_connected' => false,
+            'rtt_ms'       => $rttMs,
+            'error'        => $error,
+        ];
     }
 }
