@@ -11,7 +11,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        php: ["8.1", "8.2", "8.3"]
+        # Magento's coding-standard package (^32.0) does not yet support PHP 8.3.
+        # v0.2 will add 8.3 once the toolchain catches up.
+        php: ["8.1", "8.2"]
     steps:
       - uses: actions/checkout@v4
 
