@@ -117,8 +117,9 @@ final class OstaxClientTest extends TestCase
         $client = new OstaxClient($curl, new Json(), $config, $this->createMock(LoggerInterface::class));
         $client->calculate(['lines' => []]);
 
+        $expected = ['ost.example.com:443:203.0.113.10'];
         self::assertIsArray($capturedResolve);
-        self::assertSame(['ost.example.com:443:203.0.113.10'], $capturedResolve);
+        self::assertSame($expected, $capturedResolve);
     }
 
     public function testCalculateDoesNotSetCurlResolveWhenPinnedIpEmpty(): void
@@ -160,8 +161,10 @@ final class OstaxClientTest extends TestCase
             $client->calculate(['lines' => []]);
         }
 
-        self::assertSame(['ost.example.com:443:203.0.113.10'], $captured[0]);
-        self::assertSame(['ost.example.com:80:203.0.113.10'], $captured[1]);
+        $expectedHttps = ['ost.example.com:443:203.0.113.10'];
+        $expectedHttp = ['ost.example.com:80:203.0.113.10'];
+        self::assertSame($expectedHttps, $captured[0]);
+        self::assertSame($expectedHttp, $captured[1]);
     }
 
     public function testHealthCheckHappyPath(): void
