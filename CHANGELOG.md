@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-05-13
+
+### Added
+- **DNS-rebinding mitigation via IP pinning.** When the admin's "Restrict and Pin Engine URL" toggle (`osstax/general/restrict_to_public_ips`) is enabled, the backend model now persists the resolved IP to `osstax/general/api_url_pinned_ip` in the same scope as the URL. Subsequent engine calls dial that pinned IP via cURL `CURLOPT_RESOLVE`, bypassing DNS at request time entirely.
+- New `Config::getPinnedIp()` getter and `Config::PATH_PINNED_IP` constant.
+- `EJOsterberg\OpenSalesTax\Model\Config\Backend\ApiUrl::afterSave()` writes (or deletes) the pin via `Magento\Framework\App\Config\Storage\WriterInterface`.
+- `OstaxClient::applyPinnedIp()` injects the `host:port:pinned-ip` triple into `CURLOPT_RESOLVE` before each request when the pin is set.
+- 9 new unit tests (63 total, up from 54) — validator return value, backend `afterSave` pin/clear behavior, scope handling, `Config::getPinnedIp` happy path + unset, OstaxClient `CURLOPT_RESOLVE` set/not-set behavior, correct default ports for http (80) and https (443).
+
+### Changed
+- `ApiUrlValidator::validate()` now returns the resolved IP (`string`) when restrict-to-public-IPs is on, or `null` otherwise — providing the value the backend model needs to pin. Behavior unchanged for callers that only care about throw-on-failure.
+- Admin field label updated from "Restrict Engine URL to Public IPs" → "Restrict and Pin Engine URL", with an expanded comment documenting the pinning behavior and the re-save-on-IP-rotation requirement.
+
+### Security
+- Closes the DNS-rebinding caveat documented in `specs/security/audit-2026-05-13-v1.1.md`. The attack ("host resolves public at save time, private at request time") is now mitigated for merchants who enable the toggle.
+- Default behavior unchanged: toggle defaults to **No**; merchants self-hosting OST on the same VM as Magento see no behavior change.
+- SonarQube re-scan: 0 open issues. One `php:S3415` false positive on a `assertSame(['expected-literal'], $captured)` test assertion was reviewed and marked Won't Fix with rationale (PHPUnit's documented argument order is `assertSame($expected, $actual)`; the rule's inline-literal heuristic misfires here).
+
+### Caveats
+- Operational note: if the engine's IP rotates (cloud autoscale, server move), the admin must re-save the URL field to refresh the pin. The current pinned IP is visible in `core_config_data` under `osstax/general/api_url_pinned_ip` but not surfaced in the admin UI (a read-only display field is a v1.3 polish candidate).
+- The pin is keyed by `(host, port)`, so changing the URL's port also requires a re-save to refresh.
+
 ## [1.1.0] - 2026-05-13
 
 ### Added
@@ -64,7 +86,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Decrypted in memory only at request time, never logged.
 - Customer addresses and full payloads excluded from log statements.
 
-[Unreleased]: https://github.com/ejosterberg/opensalestax-magento/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/ejosterberg/opensalestax-magento/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/ejosterberg/opensalestax-magento/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/ejosterberg/opensalestax-magento/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/ejosterberg/opensalestax-magento/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/ejosterberg/opensalestax-magento/releases/tag/v0.1.0

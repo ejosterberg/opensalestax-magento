@@ -1,7 +1,7 @@
 # Current State — opensalestax-magento
 
-**Last updated:** 2026-05-13 (v1.1.0 shipped)
-**Status:** **v1.1.0 released.** Composer-installable Magento 2 module wired against the OpenSalesTax engine. Unit-tested (54 tests, all green on PHP 8.1 + 8.2 CI matrix). SonarQube clean (0 open issues across every severity; A across all ratings). v1.1 closed the two v1.0 security carry-overs: server-side URL revalidation and an opt-in private-IP allowlist toggle.
+**Last updated:** 2026-05-13 (v1.2.0 shipped)
+**Status:** **v1.2.0 released.** Composer-installable Magento 2 module wired against the OpenSalesTax engine. Unit-tested (63 tests, all green on PHP 8.1 + 8.2 CI matrix). SonarQube clean (0 open issues; A across all ratings). v1.2 closed the DNS-rebinding caveat from v1.1 via save-time IP pinning + runtime `CURLOPT_RESOLVE`.
 
 ## What's shipped
 
@@ -23,6 +23,14 @@ Initial installable release: HTTP client, the two plugins, admin config, ADR-001
 - Closes the two v1.0 audit carry-overs (A05, A10). Documented in `specs/security/audit-2026-05-13-v1.1.md`.
 - 54 unit tests (up from 33). NCLOC 590 → 695.
 
+### v1.2.0 (2026-05-13) — DNS rebinding closed
+
+- Save-time IP pin: backend_model writes `osstax/general/api_url_pinned_ip` via `WriterInterface` when the toggle is on.
+- Runtime `CURLOPT_RESOLVE`: `OstaxClient` reads the pin and forces cURL to dial that IP — bypasses DNS at request time, defeats DNS rebinding.
+- Bundled with the existing `restrict_to_public_ips` toggle (label updated to "Restrict and Pin Engine URL"). Default still off.
+- Closes the v1.1 caveat. Documented in `specs/security/audit-2026-05-13-v1.2.md`.
+- 63 unit tests (up from 54). NCLOC 695 → 747.
+
 ## Where the upstream engine is
 
 OpenSalesTax engine v1 HTTP API. Shared dev instance at `http://10.32.161.126:8080` (v0.55.4 confirmed during stage 04 health check). Production-ready engine pin: v0.22+ (pre-v0.22 had the SD-state-bleed bug closed in v0.22.0).
@@ -43,6 +51,7 @@ Magento 2 `^2.4.6`. Adobe's lifecycle policy keeps 2.4.6 + 2.4.7 supported throu
 | `specs/security/audit-2026-05-13.md` | Stage 04 initial security audit (raised 1 CRITICAL + 8 MAJOR) |
 | `specs/security/audit-2026-05-13-followup.md` | Stage 06 follow-up audit (0 open after refactor) |
 | `specs/security/audit-2026-05-13-v1.1.md` | v1.1 audit (A05 + A10 carry-overs closed) |
+| `specs/security/audit-2026-05-13-v1.2.md` | v1.2 audit (DNS rebinding closed via IP pinning) |
 | `specs/demo-deployment.md` | Stage 05 status — VM up, Magento bootstrap blocked on Marketplace credentials |
 
 ## Distribution
