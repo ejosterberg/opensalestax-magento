@@ -2,7 +2,7 @@ includes:
     - vendor/bitexpert/phpstan-magento/extension.neon
 
 parameters:
-    level: 6
+    level: 8
     paths:
         - EJOsterberg/OpenSalesTax
     excludePaths:
@@ -11,3 +11,12 @@ parameters:
     scanFiles:
         - EJOsterberg/OpenSalesTax/Test/Stubs/MagentoFramework.php
     reportUnmatchedIgnoredErrors: false
+    ignoreErrors:
+        # QuoteTotalsTaxPlugin types its Magento subjects/args as `object` to avoid
+        # pulling magento/module-quote into composer requires (Marketplace-only).
+        # The plugin uses method_exists() guards at runtime; static analysis cannot
+        # follow those, so we tell PHPStan to allow the duck-typed calls.
+        # v0.2 candidate: ship full Quote stubs and tighten this.
+        -
+            message: '#Call to an undefined method object::(getId|getQuoteCurrencyCode|getCountryId|getRegionCode|getPostcode|getCity|getRowTotal|getQty)\(\)#'
+            path: EJOsterberg/OpenSalesTax/Plugin/QuoteTotalsTaxPlugin.php
