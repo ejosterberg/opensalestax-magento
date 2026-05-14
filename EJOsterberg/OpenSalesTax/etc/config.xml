@@ -8,6 +8,7 @@
                 <api_url/>
                 <api_token/>
                 <fail_hard>0</fail_hard>
+                <restrict_to_public_ips>0</restrict_to_public_ips>
             </general>
         </osstax>
     </default>

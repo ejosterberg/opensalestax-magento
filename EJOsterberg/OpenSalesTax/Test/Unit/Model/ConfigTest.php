@@ -84,4 +84,17 @@ final class ConfigTest extends TestCase
         self::assertTrue($config->isConfigured());
         self::assertFalse($config->isConfigured());
     }
+
+    public function testIsRestrictToPublicIpsReadsFlag(): void
+    {
+        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
+        $scopeConfig->method('isSetFlag')
+            ->willReturnMap([
+                [Config::PATH_RESTRICT_TO_PUBLIC_IPS, 'store', null, true],
+            ]);
+
+        $config = new Config($scopeConfig, $this->createMock(EncryptorInterface::class));
+
+        self::assertTrue($config->isRestrictToPublicIps());
+    }
 }

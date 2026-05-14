@@ -20,6 +20,7 @@ class Config
     public const PATH_API_URL = 'osstax/general/api_url';
     public const PATH_API_TOKEN = 'osstax/general/api_token';
     public const PATH_FAIL_HARD = 'osstax/general/fail_hard';
+    public const PATH_RESTRICT_TO_PUBLIC_IPS = 'osstax/general/restrict_to_public_ips';
 
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
@@ -80,5 +81,19 @@ class Config
     public function isConfigured(?string $scopeCode = null): bool
     {
         return $this->getApiUrl($scopeCode) !== '';
+    }
+
+    /**
+     * Whether the admin has opted into rejecting engine URLs that resolve to
+     * a private or reserved IP range. Defaults to false because the supported
+     * pattern is merchant-self-hosted on the same VM as Magento.
+     */
+    public function isRestrictToPublicIps(?string $scopeCode = null): bool
+    {
+        return $this->scopeConfig->isSetFlag(
+            self::PATH_RESTRICT_TO_PUBLIC_IPS,
+            ScopeInterface::SCOPE_STORE,
+            $scopeCode
+        );
     }
 }

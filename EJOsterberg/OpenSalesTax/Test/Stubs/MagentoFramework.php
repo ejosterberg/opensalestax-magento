@@ -173,3 +173,101 @@ namespace Magento\Store\Model {
         }
     }
 }
+
+namespace Magento\Framework\App\Config {
+    if (!class_exists(__NAMESPACE__ . '\\Value', false)) {
+        /**
+         * Minimal stub of Magento's config backend-model base. The real class
+         * extends `Magento\Framework\Model\AbstractModel` which pulls in heavy
+         * Magento internals (registry, cache type list, resource model, etc.);
+         * we only need enough surface for backend_model unit tests:
+         *   - getValue / setValue
+         *   - getFieldsetDataValue(name) — for reading sibling fields from the
+         *     same admin form submission
+         *   - beforeSave() — the lifecycle hook we override
+         */
+        class Value
+        {
+            /** @var array<string, mixed> */
+            private array $_data = [];
+
+            /**
+             * Accept any constructor args so subclasses can declare the real
+             * Magento DI signature without us reproducing it.
+             */
+            public function __construct(...$args)
+            {
+            }
+
+            /**
+             * @return mixed
+             */
+            public function getValue()
+            {
+                return $this->_data['value'] ?? null;
+            }
+
+            public function setValue(mixed $value): self
+            {
+                $this->_data['value'] = $value;
+                return $this;
+            }
+
+            /**
+             * @return mixed
+             */
+            public function getFieldsetDataValue(string $name)
+            {
+                return $this->_data['fieldset_data'][$name] ?? null;
+            }
+
+            public function setFieldsetDataValue(string $name, mixed $value): self
+            {
+                $this->_data['fieldset_data'][$name] = $value;
+                return $this;
+            }
+
+            public function beforeSave(): self
+            {
+                return $this;
+            }
+        }
+    }
+}
+
+namespace Magento\Framework\Exception {
+    if (!class_exists(__NAMESPACE__ . '\\LocalizedException', false)) {
+        /**
+         * Minimal stub of Magento's localizable exception. Real implementation
+         * accepts a Phrase; we accept any stringable for the test surface.
+         */
+        class LocalizedException extends \Exception
+        {
+            /**
+             * @param string|object $phrase Either a plain string or a Phrase-like object.
+             */
+            public function __construct($phrase, ?\Throwable $cause = null, int $code = 0)
+            {
+                parent::__construct((string)$phrase, $code, $cause);
+            }
+        }
+    }
+}
+
+namespace {
+    if (!function_exists('__')) {
+        /**
+         * Magento's translation helper. Declared in the global namespace by
+         * Magento at runtime via `app/functions.php`. In production it returns
+         * a Phrase instance; for tests we return the formatted string and rely
+         * on the stubbed LocalizedException accepting `string|object`.
+         */
+        function __(string $text, ...$args): string
+        {
+            if ($args === []) {
+                return $text;
+            }
+            return vsprintf($text, $args);
+        }
+    }
+}

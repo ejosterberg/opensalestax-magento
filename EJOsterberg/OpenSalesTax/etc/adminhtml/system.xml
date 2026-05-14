@@ -13,6 +13,7 @@
                     <label>Engine API URL</label>
                     <comment>Base URL of your self-hosted OpenSalesTax engine, e.g. https://ost.example.com</comment>
                     <validate>validate-url</validate>
+                    <backend_model>EJOsterberg\OpenSalesTax\Model\Config\Backend\ApiUrl</backend_model>
                 </field>
                 <field id="api_token" translate="label comment" type="obscure" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>API Token (optional)</label>
@@ -22,6 +23,11 @@
                 <field id="fail_hard" translate="label comment" type="select" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Fail Hard on Engine Error</label>
                     <comment>If Yes, an unreachable engine blocks checkout. If No (default), the module falls back to Magento's built-in tax tables and logs a warning.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="restrict_to_public_ips" translate="label comment" type="select" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Restrict Engine URL to Public IPs</label>
+                    <comment>If Yes, the Engine API URL must resolve to a public IP at save time. Useful when the engine runs on a separate host. If No (default), localhost / RFC1918 / link-local hosts are permitted — the supported pattern when Magento and OST run on the same VM.</comment>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
             </group>
