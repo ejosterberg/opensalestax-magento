@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.3] - 2026-05-15
+
+### Fixed
+
+- **Bug D — `QuoteTotalsTaxPlugin::beforeCollect` had wrong arity for the target.** Magento's compiled `Interceptor` uses the plugin method's signature to decide what to forward to the parent. The target is `Magento\Tax\Model\Sales\Total\Quote\Tax::collect(Quote $quote, ShippingAssignment $shippingAssignment, Total $total)` — three args after `$subject`. The plugin declared only `(object $subject, object $shippingAssignment, object $total)` (1 + 2 args). Once Bug C unmasked the plugin in v1.3.2, every `collectTotals()` crashed with `ArgumentCountError: Too few arguments to function ...::collect(), 2 passed and exactly 3 expected`. Both `beforeCollect` and `afterCollect` now mirror the target signature exactly. Latent since v0.1.0 but masked by Bug C — only surfaced on the v1.3.2 re-verify run on VM 914.
+
+### Added
+
+- **`Test\Unit\Etc\PluginAritySignatureTest`** — generic regression coverage for the entire class of plugin/target arity-mismatch bugs that v1.3.0–v1.3.2 ran into. Uses PHP reflection to walk every plugin's `before*` / `after* `/ `around*` methods and assert each declares the right number of parameters relative to the corresponding target method (looked up via a curated `TARGET_METHOD_ARITIES` map keyed by target class + method, with verifying `vendor/magento/...` path comments). Verified to fail on the v0.1.0–v1.3.2 buggy 1+2 signature. Will catch any future regression where a plugin method's arg count drifts from its target's.
+
+### Compatibility
+
+No public API changes. Strict improvement over v1.3.2 — Bug D made all checkouts crash with `ArgumentCountError` (previously masked by Bug C silently no-opping the plugin entirely). v1.3.3 is the first release where Magento checkouts actually compute tax.
+
+### The four-bug post-mortem (final)
+
+| Bug | Latent since | Fixed in | Why CI couldn't catch it | Why prior subagent runs couldn't catch it |
+|---|---|---|---|---|
+| A — backend-model ctors broke Interceptors | v1.1.0 | v1.3.1 | Live `setup:di:compile` only | Demo blocked on Marketplace creds for ~2 weeks |
+| B — payload + response shape drifted from engine | (engine drift) | v1.3.1 | Real engine v0.58 only | Same |
+| C — di.xml target class wrong | v0.1.0 | v1.3.2 | Real `collectTotals()` only | Bug A had to be fixed first to even reach the DI layer |
+| D — plugin method arity didn't match target | v0.1.0 | **v1.3.3** | Plugin actually firing only | Bug C had to be fixed first to actually fire the plugin |
+
+All four were latent for at least 6 weeks (v1.1.0 onward) or the entire ~13-month v0.1.0+ history. Each one was masked by the next-deeper bug. Lesson logged in `portfolio/log.md`: future Magento-tier work needs a live-Magento integration test (`@magento/testing` harness or markshust-in-CI smoke test) — the unit-test surface area cannot reach these classes of issue.
+
 ## [1.3.2] - 2026-05-15
 
 ### Fixed

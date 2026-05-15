@@ -28,7 +28,7 @@ final class QuoteTotalsTaxPluginTest extends TestCase
         $registry = new QuoteTaxRegistry();
         $plugin = new QuoteTotalsTaxPlugin($config, $client, $registry, $this->createMock(LoggerInterface::class));
 
-        $plugin->beforeCollect(new stdClass(), new stdClass(), new stdClass());
+        $plugin->beforeCollect(new stdClass(), new stdClass(), new stdClass(), new stdClass());
 
         self::assertFalse($registry->has(0));
     }
@@ -52,7 +52,7 @@ final class QuoteTotalsTaxPluginTest extends TestCase
             items: [['id' => '1', 'row_total' => 100.0, 'qty' => 1]],
         );
 
-        $plugin->beforeCollect(new stdClass(), $shippingAssignment, $this->buildTotal());
+        $plugin->beforeCollect(new stdClass(), $shippingAssignment->getShipping()->getAddress()->getQuote(), $shippingAssignment, $this->buildTotal());
 
         self::assertFalse($registry->has(5));
     }
@@ -75,7 +75,7 @@ final class QuoteTotalsTaxPluginTest extends TestCase
             items: [['id' => '1', 'row_total' => 100.0, 'qty' => 1]],
         );
 
-        $plugin->beforeCollect(new stdClass(), $shippingAssignment, $this->buildTotal());
+        $plugin->beforeCollect(new stdClass(), $shippingAssignment->getShipping()->getAddress()->getQuote(), $shippingAssignment, $this->buildTotal());
 
         self::assertFalse($registry->has(6));
     }
@@ -110,7 +110,7 @@ final class QuoteTotalsTaxPluginTest extends TestCase
             items: [['id' => '1', 'row_total' => 100.0, 'qty' => 2]],
         );
 
-        $plugin->beforeCollect(new stdClass(), $shippingAssignment, $this->buildTotal(10.0));
+        $plugin->beforeCollect(new stdClass(), $shippingAssignment->getShipping()->getAddress()->getQuote(), $shippingAssignment, $this->buildTotal(10.0));
 
         self::assertTrue($registry->has(7));
         self::assertSame($expectedResponse, $registry->get(7));
@@ -158,7 +158,7 @@ final class QuoteTotalsTaxPluginTest extends TestCase
             items: [['id' => '1', 'row_total' => 100.0, 'qty' => 1]],
         );
 
-        $plugin->beforeCollect(new stdClass(), $shippingAssignment, $this->buildTotal());
+        $plugin->beforeCollect(new stdClass(), $shippingAssignment->getShipping()->getAddress()->getQuote(), $shippingAssignment, $this->buildTotal());
 
         self::assertFalse($registry->has(8));
     }
@@ -185,7 +185,7 @@ final class QuoteTotalsTaxPluginTest extends TestCase
         $this->expectException(OstaxEngineException::class);
         $this->expectExceptionMessageMatches('/fail-hard/');
 
-        $plugin->beforeCollect(new stdClass(), $shippingAssignment, $this->buildTotal());
+        $plugin->beforeCollect(new stdClass(), $shippingAssignment->getShipping()->getAddress()->getQuote(), $shippingAssignment, $this->buildTotal());
     }
 
     public function testAfterCollectWritesAppliedTaxesFromRegistry(): void
@@ -226,7 +226,7 @@ final class QuoteTotalsTaxPluginTest extends TestCase
             }
         };
 
-        $plugin->afterCollect(new stdClass(), new stdClass(), $shippingAssignment, $total);
+        $plugin->afterCollect(new stdClass(), new stdClass(), $shippingAssignment->getShipping()->getAddress()->getQuote(), $shippingAssignment, $total);
 
         self::assertNotNull($total->appliedTaxes);
         self::assertCount(2, $total->appliedTaxes);

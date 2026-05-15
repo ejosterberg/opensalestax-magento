@@ -51,45 +51,68 @@ class QuoteTotalsTaxPlugin
      * Pre-warm the registry. Magento's totals pipeline then calls getRate
      * per line and our other plugin reads from the registry.
      *
-     * @param object $subject The Magento totals collector. Untouched.
+     * Method signature MUST mirror the target's `collect()` arity exactly
+     * — Magento's compiled Interceptor uses the plugin-method signature to
+     * decide what to forward to the parent. The target is
+     * `Magento\Tax\Model\Sales\Total\Quote\Tax::collect(Quote, ShippingAssignment, Total)`
+     * → three args after `$subject`. (Bug D: the prior signature omitted
+     * `$quote` → parent called with 2 args → ArgumentCountError. Verified
+     * 2026-05-15 on VM 914. Regression test:
+     * `Test/Unit/Etc/PluginAritySignatureTest.php`.)
+     *
+     * @param object $subject Magento\Tax\Model\Sales\Total\Quote\Tax (untouched)
+     * @param object $quote Magento\Quote\Model\Quote
      * @param object $shippingAssignment Magento\Quote\Api\Data\ShippingAssignmentInterface
      * @param object $total Magento\Quote\Model\Quote\Address\Total
-     * @return array{0: object, 1: object}
+     * @return array{0: object, 1: object, 2: object}
      */
-    public function beforeCollect(object $subject, object $shippingAssignment, object $total): array
-    {
+    public function beforeCollect(
+        object $subject,
+        object $quote,
+        object $shippingAssignment,
+        object $total
+    ): array {
+        $passthrough = [$quote, $shippingAssignment, $total];
+
         if (!$this->config->isConfigured()) {
-            return [$shippingAssignment, $total];
+            return $passthrough;
         }
 
-        $quote = $this->extractQuote($shippingAssignment);
-        if ($quote === null) {
-            return [$shippingAssignment, $total];
-        }
-
-        $quoteId = (int)$quote->getId();
+        $quoteId = (int)(method_exists($quote, 'getId') ? $quote->getId() : 0);
         if ($quoteId <= 0) {
-            return [$shippingAssignment, $total];
+            // Fall back to the legacy quote-via-shipping-assignment lookup
+            // for callers that drive the plugin in non-standard ways (some
+            // custom totals collectors wrap the quote inside the
+            // ShippingAssignment before the official collect call).
+            $altQuote = $this->extractQuote($shippingAssignment);
+            if ($altQuote === null) {
+                return $passthrough;
+            }
+            $quote = $altQuote;
+            $quoteId = (int)$quote->getId();
+            if ($quoteId <= 0) {
+                return $passthrough;
+            }
         }
 
-        $currency = (string)$quote->getQuoteCurrencyCode();
+        $currency = (string)(method_exists($quote, 'getQuoteCurrencyCode') ? $quote->getQuoteCurrencyCode() : '');
         if ($currency !== self::CURRENCY_USD) {
-            return [$shippingAssignment, $total];
+            return $passthrough;
         }
 
         $shippingAddress = $this->extractShippingAddress($shippingAssignment);
         if ($shippingAddress === null) {
-            return [$shippingAssignment, $total];
+            return $passthrough;
         }
 
         $countryId = (string)$shippingAddress->getCountryId();
         if ($countryId !== self::COUNTRY_US) {
-            return [$shippingAssignment, $total];
+            return $passthrough;
         }
 
         $items = $this->extractItems($shippingAssignment);
         if ($items === []) {
-            return [$shippingAssignment, $total];
+            return $passthrough;
         }
 
         try {
@@ -110,26 +133,35 @@ class QuoteTotalsTaxPlugin
             }
         }
 
-        return [$shippingAssignment, $total];
+        return $passthrough;
     }
 
     /**
      * Surface per-jurisdiction breakdown onto the totals object.
      *
-     * @param object $subject The Magento totals collector. Untouched.
-     * @param object $result The collector return value (usually $subject).
+     * Method signature MUST mirror `Tax::collect()` arity — same Bug D
+     * reasoning as `beforeCollect` above. Magento passes the return value
+     * of the original method as `$result`, followed by the same args the
+     * method received.
+     *
+     * @param object $subject Magento\Tax\Model\Sales\Total\Quote\Tax (untouched)
+     * @param object $result The collector return value (usually $subject)
+     * @param object $quote Magento\Quote\Model\Quote
      * @param object $shippingAssignment Magento\Quote\Api\Data\ShippingAssignmentInterface
      * @param object $total Magento\Quote\Model\Quote\Address\Total
      */
     public function afterCollect(
         object $subject,
         object $result,
+        object $quote,
         object $shippingAssignment,
         object $total
     ): object {
-        $quote = $this->extractQuote($shippingAssignment);
-        if ($quote === null) {
-            return $result;
+        if (!method_exists($quote, 'getId')) {
+            $quote = $this->extractQuote($shippingAssignment);
+            if ($quote === null) {
+                return $result;
+            }
         }
 
         $quoteId = (int)$quote->getId();
