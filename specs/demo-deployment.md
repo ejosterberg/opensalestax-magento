@@ -1,6 +1,6 @@
 # Demo deployment — magento-demo VM
 
-**Status:** Infrastructure provisioned. Magento bootstrap requires Eric's Marketplace credentials. End-to-end checkout test pending.
+**Status (2026-05-15):** Magento 2.4.7-p3 bootstrapped on VM 914 via markshust devbox. OST module v1.3.1 installed via Composer path-repo, enabled, configured against the shared engine. Live MN engine math verified ($100/55403 → $9.025 tax via direct API; $110 cart with $10 shipping → $9.9275 tax). Magento end-to-end checkout via the Magento UI is pending v1.3.1 re-deploy on the VM. **Both v1.3.0 surface bugs are fixed in v1.3.1** (see "Bug history" below).
 
 ## Infrastructure
 
@@ -43,13 +43,19 @@ Eric does not currently have an `~/.composer/auth.json` with these keys. Until t
    }
    ```
 
-   Then re-run the markshust bootstrap from the kickoff:
+   Then re-run the markshust bootstrap from the kickoff. Note the **`community 2.4.7-p3`** invocation — passing just `magento.test 2.4.7` (per the original kickoff doc) tries to install `magento/project-2.4.7-edition` which doesn't exist; `community` is the required edition argument:
 
    ```bash
    ssh magento-demo bash <<'MAGENTO'
+   sudo apt-get update && sudo apt-get install -y bc       # markshust bin/start needs bc
    mkdir -p ~/magento && cd ~/magento
    curl -s https://raw.githubusercontent.com/markshust/docker-magento/master/lib/onelinesetup | \
-     bash -s -- magento.test 2.4.7
+     bash -s -- magento.test community 2.4.7-p3
+   # markshust ships compose.yaml pinned to mariadb:11.4 — Magento 2.4.7-p3
+   # only supports MariaDB 10.2-10.6, so setup:install will abort. Patch
+   # before bootstrap continues:
+   sed -i 's|mariadb:11.4|mariadb:10.6|' ~/magento/compose.yaml
+   bin/start && bin/setup magento.test
    MAGENTO
    ```
 
@@ -94,14 +100,14 @@ ssh magento-demo bash <<'MODULE'
 cd ~
 git clone https://github.com/ejosterberg/opensalestax-magento.git
 cd ~/magento/src
-docker compose exec -u www-data app composer config \
+docker compose exec -u app app composer config \
   repositories.osstax path /opensalestax-magento
-docker compose exec -u www-data app composer require \
+docker compose exec -u app app composer require \
   ejosterberg/module-opensalestax:@dev
-docker compose exec -u www-data app bin/magento module:enable EJOsterberg_OpenSalesTax
-docker compose exec -u www-data app bin/magento setup:upgrade
-docker compose exec -u www-data app bin/magento setup:di:compile
-docker compose exec -u www-data app bin/magento cache:clean
+docker compose exec -u app app bin/magento module:enable EJOsterberg_OpenSalesTax
+docker compose exec -u app app bin/magento setup:upgrade
+docker compose exec -u app app bin/magento setup:di:compile
+docker compose exec -u app app bin/magento cache:clean
 MODULE
 ```
 
@@ -110,9 +116,9 @@ MODULE
 ```bash
 ssh magento-demo bash <<'CONFIG'
 cd ~/magento/src
-docker compose exec -u www-data app bin/magento config:set osstax/general/api_url http://10.32.161.126:8080
-docker compose exec -u www-data app bin/magento config:set osstax/general/fail_hard 0
-docker compose exec -u www-data app bin/magento cache:clean
+docker compose exec -u app app bin/magento config:set osstax/general/api_url http://10.32.161.126:8080
+docker compose exec -u app app bin/magento config:set osstax/general/fail_hard 0
+docker compose exec -u app app bin/magento cache:clean
 CONFIG
 ```
 
@@ -120,8 +126,9 @@ CONFIG
 
 1. Module enabled:
    ```bash
-   ssh magento-demo 'cd ~/magento/src && docker compose exec -u www-data app bin/magento module:status | grep OpenSalesTax'
-   # Expected: EJOsterberg_OpenSalesTax (in "List of enabled modules")
+   ssh magento-demo 'cd ~/magento/src && docker compose exec -u app app bin/magento module:status EJOsterberg_OpenSalesTax'
+   # Expected: "Module is enabled" (the older `module:status | grep`
+   # shape stopped reliably labeling enabled modules in 2.4.7)
    ```
 2. DI compile succeeded: no errors in the previous block's `setup:di:compile` output.
 3. Engine reachable from the Magento container's perspective:
@@ -143,11 +150,20 @@ The end-to-end checkout requires a browser. Eric runs this manually:
 
 ## Stage 05 status against success criteria
 
-| ID | Criterion | Status |
+| ID | Criterion | Status (2026-05-15 after v1.3.1) |
 |---|---|---|
 | D1 | Demo Proxmox VM provisioned | ✓ (VM 914, IP 10.32.161.183) |
-| D2 | Magento 2.4.6+ devbox running | Blocked on Marketplace credentials |
-| D3 | OST engine running | Re-use shared engine at 10.32.161.126:8080 |
-| D4 | Module installed via Composer path repo | Pending D2 |
-| D5 | Module enabled and configured via admin | Pending D2 |
-| D6 | Real $100 MN checkout returns plausible tax | Pending D2 (manual — Eric) |
+| D2 | Magento 2.4.7-p3 devbox running | ✓ markshust devbox; admin `https://magento.test/admin` (creds `john.smith` / `password123`); 7 healthy containers (`app`, `phpfpm`, `db` mariadb:10.6, `opensearch`, `redis`, `rabbitmq`, `mailcatcher`) |
+| D3 | OST engine running | ✓ Re-using shared engine at `http://10.32.161.126:8080` (v0.58.0 verified `database_connected:true` from inside the Magento container) |
+| D4 | Module installed via Composer path repo | ✓ symlinked from `/opensalestax-magento` inside `magento-phpfpm-1`; v1.3.1 working tree |
+| D5 | Module enabled and configured via admin | Pending v1.3.1 re-deploy on VM (v1.3.0 was configured via direct DB insert as Bug A workaround; v1.3.1 fixes the underlying ctor + admin save) |
+| D6 | Real $100 MN checkout returns plausible tax | Engine math verified ($100/55403 → $9.025; $110 cart with $10 shipping → $9.9275). End-to-end Magento checkout pending v1.3.1 re-deploy on VM 914 |
+
+## Bug history surfaced by the live bootstrap
+
+The 2026-05-15 bootstrap surfaced two P0 bugs in v1.3.0 (one latent since v1.1.0):
+
+- **Bug A (since v1.1.0)** — `Model\Config\Backend\ApiUrl` + (in v1.3) `…\CategoryMapping` ctors used a `(custom-dep, ...$parentArgs)` variadic pattern. Magento Interceptors forward parent ctor args by position, so position 1 landed on our custom dep instead of `Context`. `bin/magento config:set` and admin save crashed with TypeError. Latent because the demo had been blocked on Marketplace credentials — never ran live.
+- **Bug B** — `Plugin\QuoteTotalsTaxPlugin::buildPayload()` emitted the legacy `{quote_id, destination, lines, shipping_amount}` shape; engine v0.58 only accepts the SDK-canonical `{address: {zip5}, line_items[]}` shape. Live MN cart silently returned $0 tax under fail-soft default.
+
+Both fixed in v1.3.1 (commit `a631837`, tag `v1.3.1`). Re-deploy on VM 914 + browser checkout test is the captain's next step before this spec section moves to "✓ all D2-D6 closed".
