@@ -161,9 +161,12 @@ The end-to-end checkout requires a browser. Eric runs this manually:
 
 ## Bug history surfaced by the live bootstrap
 
-The 2026-05-15 bootstrap surfaced two P0 bugs in v1.3.0 (one latent since v1.1.0):
+The 2026-05-15 bootstrap surfaced **three** P0 bugs in v1.3.0:
 
-- **Bug A (since v1.1.0)** — `Model\Config\Backend\ApiUrl` + (in v1.3) `…\CategoryMapping` ctors used a `(custom-dep, ...$parentArgs)` variadic pattern. Magento Interceptors forward parent ctor args by position, so position 1 landed on our custom dep instead of `Context`. `bin/magento config:set` and admin save crashed with TypeError. Latent because the demo had been blocked on Marketplace credentials — never ran live.
-- **Bug B** — `Plugin\QuoteTotalsTaxPlugin::buildPayload()` emitted the legacy `{quote_id, destination, lines, shipping_amount}` shape; engine v0.58 only accepts the SDK-canonical `{address: {zip5}, line_items[]}` shape. Live MN cart silently returned $0 tax under fail-soft default.
+- **Bug A (latent since v1.1.0)** — `Model\Config\Backend\ApiUrl` + (in v1.3) `…\CategoryMapping` ctors used a `(custom-dep, ...$parentArgs)` variadic pattern. Magento Interceptors forward parent ctor args by position, so position 1 landed on our custom dep instead of `Context`. `bin/magento config:set` and admin save crashed with TypeError. Latent because the demo had been blocked on Marketplace credentials — never ran live. **Fixed in v1.3.1.**
+- **Bug B** — `Plugin\QuoteTotalsTaxPlugin::buildPayload()` emitted the legacy `{quote_id, destination, lines, shipping_amount}` shape; engine v0.58 only accepts the SDK-canonical `{address: {zip5}, line_items[]}` shape. Live MN cart silently returned $0 tax under fail-soft default. **Fixed in v1.3.1.**
+- **Bug C (latent since v0.1.0)** — `etc/di.xml` registered the totals plugin against `Magento\Quote\Model\Quote\Address\Total\Tax` (which doesn't exist in Magento 2.4.x). Real target is `Magento\Tax\Model\Sales\Total\Quote\Tax`. Magento's DI compiler silently no-ops plugins on non-existent targets — so even with v1.3.1 in place, every cart returned `tax_amount: 0` because the totals plugin never fired and the registry stayed empty. **Fixed in v1.3.2 (commit `fb39335`, tag `v1.3.2`)** + new `Test\Unit\Etc\DiXmlTargetClassTest` regression test that parses di.xml and asserts every target class is loadable.
 
-Both fixed in v1.3.1 (commit `a631837`, tag `v1.3.1`). Re-deploy on VM 914 + browser checkout test is the captain's next step before this spec section moves to "✓ all D2-D6 closed".
+All three were invisible to unit-test CI because they manifest only under live conditions (`setup:di:compile` against real Magento for A; real engine v0.58 for B; real `collectTotals()` for C). The unit tests instantiate plugins directly with mocks, bypassing DI wiring.
+
+Re-deploy v1.3.2 on VM 914 + browser checkout test is the captain's next step before this spec section moves to "✓ all D2-D6 closed".
