@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-05-15
+
+### Fixed
+
+- **Bug C — `etc/di.xml` registered the totals plugin against a non-existent class.** Since v0.1.0 the plugin targeted `Magento\Quote\Model\Quote\Address\Total\Tax`, which doesn't exist in Magento 2.4.x. The actual totals collector is `Magento\Tax\Model\Sales\Total\Quote\Tax` (registered in `vendor/magento/module-tax/etc/sales.xml` as `<item name="tax" instance="..." sort_order="450">`). Magento's DI compiler silently no-ops plugins on non-existent target classes — `setup:di:compile` exited clean — so the bug was invisible until a real `collectTotals()` call ran on VM 914. End-to-end consequence: even with v1.3.1's Bugs-A+B fixes in place, every checkout returned `tax_amount: 0` because `QuoteTotalsTaxPlugin::beforeCollect` never fired → registry stayed empty → `CalculationPlugin::afterGetRate` returned Magento's empty rule-based rate (zero). Single-line fix in `di.xml`.
+
+### Added
+
+- **`Test\Unit\Etc\DiXmlTargetClassTest`** — regression test for Bug C. Parses every `<type name="...">` in `etc/di.xml` and asserts the named class is either (a) loadable in PHP's class table (via the test stubs or real autoloader), (b) on a curated `KNOWN_MAGENTO_CLASSES` allowlist that requires a verifying `vendor/magento/...` path comment, or (c) explicitly NOT on a `KNOWN_BAD_CLASSES` deny-list (currently just the historical Bug C target). A second test pins the totals-plugin target to `Magento\Tax\Model\Sales\Total\Quote\Tax` as a sentinel against future regressions. Verified to fail on the buggy class name and pass on the corrected one. 73 tests / 153 assertions total (was 71 / 145).
+
+### Compatibility
+
+No public API changes. Strict improvement over v1.3.1 — Bug C silently broke checkouts since v0.1.0; this finally fixes them. Anyone who saw "$0 tax on every cart" with v1.3.0 or v1.3.1 should upgrade to v1.3.2 immediately.
+
+### The three-bug post-mortem
+
+- **Bug A** (latent v1.1.0+): backend-model ctors used a variadic `...$parentArgs` pattern that broke Magento Interceptors. **Fixed in v1.3.1.**
+- **Bug B**: outbound payload + response parser hadn't followed engine schema drift to v0.58. **Fixed in v1.3.1.**
+- **Bug C** (latent v0.1.0+): `di.xml` plugin target class name was wrong from the original kickoff commit. **Fixed in v1.3.2 + regression-tested.**
+
+All three were invisible to CI because they only manifest under: (A) live `setup:di:compile` against real Magento, (B) live engine call against an actual v0.58 server, (C) live `collectTotals()` against a real Quote. Lesson logged in `portfolio/log.md`: future Magento-tier work needs a live-Magento integration test (likely `@magento/testing`) to catch class-of-bug-C issues at PR time, not at v0.1.0+13-month live-deployment time.
+
 ## [1.3.1] - 2026-05-15
 
 ### Fixed
