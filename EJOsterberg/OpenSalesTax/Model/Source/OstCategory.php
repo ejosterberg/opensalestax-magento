@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace EJOsterberg\OpenSalesTax\Model\Source;
 
-use Magento\Framework\Data\OptionSourceInterface;
-
 /**
  * Canonical OpenSalesTax category vocabulary.
  *
@@ -20,7 +18,14 @@ use Magento\Framework\Data\OptionSourceInterface;
  * the affected order line, and Magento's built-in tax math handles
  * it (typically zero).
  */
-class OstCategory implements OptionSourceInterface
+/**
+ * Magento's source-model surface is duck-typed: any class with a public
+ * `toOptionArray()` method works as a `source_model` in `etc/system.xml`.
+ * We deliberately don't `implements \Magento\Framework\Data\OptionSourceInterface`
+ * here so this class is instantiable in unit tests without Magento's
+ * full classloader bootstrapped.
+ */
+class OstCategory
 {
     public const CATEGORY_GENERAL = 'general';
     public const CATEGORY_CLOTHING = 'clothing';

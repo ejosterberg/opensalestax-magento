@@ -45,7 +45,7 @@ final class ConfigTest extends TestCase
             ->with('encrypted-blob')
             ->willReturn('plaintext-token');
 
-        $config = new Config($scopeConfig, $encryptor);
+        $config = new Config($scopeConfig, $encryptor, $this->createMock(Json::class));
 
         self::assertSame('plaintext-token', $config->getApiToken());
     }
@@ -58,7 +58,7 @@ final class ConfigTest extends TestCase
         $encryptor = $this->createMock(EncryptorInterface::class);
         $encryptor->expects(self::never())->method('decrypt');
 
-        $config = new Config($scopeConfig, $encryptor);
+        $config = new Config($scopeConfig, $encryptor, $this->createMock(Json::class));
 
         self::assertSame('', $config->getApiToken());
     }
