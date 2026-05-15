@@ -5,8 +5,14 @@ declare(strict_types=1);
 namespace EJOsterberg\OpenSalesTax\Model\Config\Backend;
 
 use EJOsterberg\OpenSalesTax\Model\Source\OstCategory;
+use Magento\Framework\App\Cache\TypeListInterface;
+use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Config\Value;
+use Magento\Framework\Data\Collection\AbstractDb;
 use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\Model\Context;
+use Magento\Framework\Model\ResourceModel\AbstractResource;
+use Magento\Framework\Registry;
 use Magento\Framework\Serialize\Serializer\Json;
 
 /**
@@ -32,14 +38,33 @@ use Magento\Framework\Serialize\Serializer\Json;
 class CategoryMapping extends Value
 {
     /**
-     * @param mixed ...$parentArgs Pass-through to Magento\Framework\App\Config\Value.
+     * Use Magento's explicit backend-model parent ctor signature. The
+     * `...$parentArgs` variadic style breaks Magento's compiled
+     * Interceptor subclasses, which forward parent ctor args BY POSITION
+     * — Position 1 must be `Context`, not our custom dep. (Verified
+     * 2026-05-15 via live setup:di:compile on VM 914.)
+     *
+     * Custom OST deps (`Json`) go AFTER the Magento ones so Interceptor's
+     * positional forward fills the parent ctor cleanly.
+     *
+     * @param array<string, mixed> $data
      */
     public function __construct(
-        protected readonly Json $json,
-        ...$parentArgs
+        Context $context,
+        Registry $registry,
+        ScopeConfigInterface $config,
+        TypeListInterface $cacheTypeList,
+        Json $json,
+        ?AbstractResource $resource = null,
+        ?AbstractDb $resourceCollection = null,
+        array $data = []
     ) {
-        parent::__construct(...$parentArgs);
+        $this->json = $json;
+        parent::__construct($context, $registry, $config, $cacheTypeList, $resource, $resourceCollection, $data);
     }
+
+    /** @var Json */
+    protected $json;
 
     /**
      * Validate + serialize before persisting.

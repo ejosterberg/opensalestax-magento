@@ -6,10 +6,15 @@ namespace EJOsterberg\OpenSalesTax\Model\Config\Backend;
 
 use EJOsterberg\OpenSalesTax\Model\Validator\ApiUrlValidator;
 use InvalidArgumentException;
+use Magento\Framework\App\Cache\TypeListInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Config\Storage\WriterInterface;
 use Magento\Framework\App\Config\Value;
+use Magento\Framework\Data\Collection\AbstractDb;
 use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\Model\Context;
+use Magento\Framework\Model\ResourceModel\AbstractResource;
+use Magento\Framework\Registry;
 
 /**
  * Backend model for `osstax/general/api_url`.
@@ -39,15 +44,33 @@ class ApiUrl extends Value
     private bool $restrictWasOnAtSave = false;
 
     /**
-     * @param WriterInterface $configWriter Magento's config writer; used in afterSave() to persist the resolved IP pin.
-     * @param mixed ...$parentArgs Pass-through to the Magento\Framework\App\Config\Value parent constructor.
+     * Use Magento's explicit backend-model parent ctor signature. The
+     * `...$parentArgs` variadic style breaks Magento's compiled
+     * Interceptor subclasses, which forward parent ctor args BY POSITION
+     * — Position 1 must be `Context`, not our custom dep. (Verified
+     * 2026-05-15 via live setup:di:compile on VM 914.)
+     *
+     * Custom OST deps (e.g. `WriterInterface`) go AFTER the Magento ones,
+     * mirroring how OCA-style modules layer their deps onto the parent.
+     *
+     * @param array<string, mixed> $data
      */
     public function __construct(
-        protected readonly WriterInterface $configWriter,
-        ...$parentArgs
+        Context $context,
+        Registry $registry,
+        ScopeConfigInterface $config,
+        TypeListInterface $cacheTypeList,
+        WriterInterface $configWriter,
+        ?AbstractResource $resource = null,
+        ?AbstractDb $resourceCollection = null,
+        array $data = []
     ) {
-        parent::__construct(...$parentArgs);
+        $this->configWriter = $configWriter;
+        parent::__construct($context, $registry, $config, $cacheTypeList, $resource, $resourceCollection, $data);
     }
+
+    /** @var WriterInterface */
+    protected $configWriter;
 
     /**
      * @throws LocalizedException When the URL is malformed, uses the wrong

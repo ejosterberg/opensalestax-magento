@@ -166,6 +166,27 @@ class QuoteTotalsTaxPlugin
     /**
      * Build the engine request body from the quote.
      *
+     * Schema is OpenSalesTax engine v0.58+:
+     * ```
+     * {
+     *   "address":    {"zip5": "55403"},
+     *   "line_items": [{"amount": "100.00", "category": "general"}, ...]
+     * }
+     * ```
+     *
+     * Notes:
+     *  - `amount` MUST be a decimal STRING (not float) — engine quantizes
+     *    per-jurisdiction in fixed-point; floats lose precision.
+     *  - Shipping is folded in as an extra line_item with `category=shipping`
+     *    when non-zero — engine handles per-state shipping-tax rules via
+     *    that category (matches the Saleor / Medusa connector pattern).
+     *  - `address.zip5` only — engine resolves the rest via ZIP. The ZIP is
+     *    extracted as the first 5 digits of the Magento postcode.
+     *  - Lines without a usable id or a non-positive amount are skipped.
+     *  - The 4 unused parameters `$quoteId`, `$shippingAddress.region/city/country`
+     *    that the v1.3.0 payload included are dropped — the engine ignores
+     *    them anyway in v0.58.
+     *
      * @param array<int, object> $items
      * @return array<string, mixed>
      */
@@ -175,14 +196,16 @@ class QuoteTotalsTaxPlugin
         // Avoids N scope_config reads + JSON-decode passes when a quote has N lines.
         $categoryMapping = $this->config->getCategoryMapping();
 
-        $lines = [];
+        $lineItems = [];
         foreach ($items as $item) {
             $lineId = (string)(method_exists($item, 'getId') ? $item->getId() : '');
             if ($lineId === '') {
                 continue;
             }
             $amount = (float)(method_exists($item, 'getRowTotal') ? $item->getRowTotal() : 0.0);
-            $quantity = (float)(method_exists($item, 'getQty') ? $item->getQty() : 1.0);
+            if ($amount <= 0.0) {
+                continue;
+            }
 
             // Resolve OST category from the line's Magento tax class. Try the
             // item's getTaxClassId(); fall back to the underlying product if the
@@ -199,26 +222,29 @@ class QuoteTotalsTaxPlugin
             }
             $category = $categoryMapping[$taxClassId] ?? \EJOsterberg\OpenSalesTax\Model\Config::DEFAULT_CATEGORY;
 
-            $lines[] = [
-                'line_id'  => $lineId,
-                'amount'   => $amount,
-                'quantity' => $quantity,
+            $lineItems[] = [
+                'amount'   => number_format($amount, 2, '.', ''),
                 'category' => $category,
             ];
         }
 
         $shippingAmount = (float)(method_exists($total, 'getShippingAmount') ? $total->getShippingAmount() : 0.0);
+        if ($shippingAmount > 0.0) {
+            $lineItems[] = [
+                'amount'   => number_format($shippingAmount, 2, '.', ''),
+                'category' => 'shipping',
+            ];
+        }
+
+        $rawPostcode = (string)$shippingAddress->getPostcode();
+        $digitsOnly = preg_replace('/\D/', '', $rawPostcode) ?? '';
+        $zip5 = strlen($digitsOnly) >= 5 ? substr($digitsOnly, 0, 5) : $digitsOnly;
 
         return [
-            'quote_id'    => $quoteId,
-            'destination' => [
-                'country'  => (string)$shippingAddress->getCountryId(),
-                'region'   => (string)$shippingAddress->getRegionCode(),
-                'postcode' => (string)$shippingAddress->getPostcode(),
-                'city'     => (string)$shippingAddress->getCity(),
+            'address'    => [
+                'zip5' => $zip5,
             ],
-            'lines'           => $lines,
-            'shipping_amount' => $shippingAmount,
+            'line_items' => $lineItems,
         ];
     }
 

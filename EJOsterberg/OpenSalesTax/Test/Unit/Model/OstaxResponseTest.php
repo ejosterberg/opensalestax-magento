@@ -44,8 +44,12 @@ final class OstaxResponseTest extends TestCase
         self::assertSame([], $response->lineTaxes);
     }
 
-    public function testFromArraySkipsLinesWithoutLineId(): void
+    public function testFromArraySynthesizesKeysForLinesWithoutLineId(): void
     {
+        // Engine v0.58+ doesn't send `line_id`. Lines must still parse and
+        // be addressable; we synthesize a 0-based array-index key so the
+        // `lineTaxes` array shape stays stable for downstream consumers.
+        // Lines that DO carry a line_id keep it (legacy support).
         $response = OstaxResponse::fromArray([
             'lines' => [
                 ['tax' => 1.0, 'rate' => 0.05],
@@ -53,8 +57,45 @@ final class OstaxResponseTest extends TestCase
             ],
         ]);
 
-        self::assertCount(1, $response->lineTaxes);
+        self::assertCount(2, $response->lineTaxes);
+        self::assertArrayHasKey('0', $response->lineTaxes);
         self::assertArrayHasKey('2', $response->lineTaxes);
+    }
+
+    public function testFromArrayAcceptsRatePctStringFromEngineV058(): void
+    {
+        // Engine v0.58 sends `rate_pct` as a percent string ("9.025") instead
+        // of `rate` as a decimal float (0.09025). Internal model normalizes
+        // back to decimal so existing consumer code (`getEffectiveRatePercent`,
+        // `afterCollect` jurisdiction loop) keeps working unchanged.
+        $response = OstaxResponse::fromArray([
+            'subtotal'  => '100.00',
+            'tax_total' => '9.025',
+            'lines' => [
+                [
+                    'amount'   => '100.00',
+                    'category' => 'general',
+                    'tax'      => '9.025',
+                    'rate_pct' => '9.025',
+                    'jurisdictions' => [
+                        ['name' => 'Minnesota',       'type' => 'state',   'rate_pct' => '6.875', 'tax' => '6.875'],
+                        ['name' => 'Hennepin County', 'type' => 'county',  'rate_pct' => '0.15',  'tax' => '0.15'],
+                        ['name' => 'Minneapolis',     'type' => 'city',    'rate_pct' => '0.50',  'tax' => '0.50'],
+                    ],
+                ],
+            ],
+        ]);
+
+        self::assertEqualsWithDelta(9.025, $response->taxTotal, 0.0001);
+        self::assertCount(1, $response->lineTaxes);
+        self::assertEqualsWithDelta(9.025, $response->getEffectiveRatePercent(), 0.0001);
+
+        $line = $response->lineTaxes['0'];
+        self::assertEqualsWithDelta(0.09025, $line['rate'], 0.00001);
+        self::assertCount(3, $line['jurisdictions']);
+        self::assertSame('Minnesota', $line['jurisdictions'][0]['name']);
+        self::assertEqualsWithDelta(0.06875, $line['jurisdictions'][0]['rate'], 0.00001);
+        self::assertEqualsWithDelta(6.875, $line['jurisdictions'][0]['tax'], 0.001);
     }
 
     public function testGetEffectiveRatePercentConvertsDecimalToPercent(): void

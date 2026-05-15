@@ -278,6 +278,70 @@ namespace Magento\Framework\App\Config {
     }
 }
 
+namespace Magento\Framework\Model {
+    if (!class_exists(__NAMESPACE__ . '\\Context', false)) {
+        /**
+         * Stub of Magento's model `Context`. The real class wires event
+         * dispatcher + app state + action validator, but for our backend-
+         * model unit tests we only need the type to exist.
+         */
+        class Context
+        {
+        }
+    }
+}
+
+namespace Magento\Framework\Model\ResourceModel {
+    if (!class_exists(__NAMESPACE__ . '\\AbstractResource', false)) {
+        /**
+         * Stub of Magento's resource-model base. Backend models accept this
+         * as an optional ctor arg; we never invoke any methods on it from
+         * unit tests.
+         */
+        class AbstractResource
+        {
+        }
+    }
+}
+
+namespace Magento\Framework\Data\Collection {
+    if (!class_exists(__NAMESPACE__ . '\\AbstractDb', false)) {
+        /**
+         * Stub of Magento's DB-collection base. Same role as AbstractResource
+         * above — type-only for backend-model ctor signatures.
+         */
+        class AbstractDb
+        {
+        }
+    }
+}
+
+namespace Magento\Framework {
+    if (!class_exists(__NAMESPACE__ . '\\Registry', false)) {
+        /**
+         * Stub of Magento's `Registry` (deprecated upstream but still
+         * required by `Magento\Framework\Model\AbstractModel::__construct`).
+         */
+        class Registry
+        {
+        }
+    }
+}
+
+namespace Magento\Framework\App\Cache {
+    if (!interface_exists(__NAMESPACE__ . '\\TypeListInterface', false)) {
+        /**
+         * Stub of Magento's cache-type-list interface. Backend models
+         * receive this so they can invalidate caches after save; we never
+         * exercise that path in unit tests.
+         */
+        interface TypeListInterface
+        {
+            public function invalidate(string|array $typeCode): void;
+        }
+    }
+}
+
 namespace Magento\Framework\Exception {
     if (!class_exists(__NAMESPACE__ . '\\LocalizedException', false)) {
         /**

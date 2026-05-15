@@ -115,10 +115,25 @@ final class QuoteTotalsTaxPluginTest extends TestCase
         self::assertTrue($registry->has(7));
         self::assertSame($expectedResponse, $registry->get(7));
         self::assertIsArray($capturedPayload);
-        self::assertSame(7, $capturedPayload['quote_id']);
-        self::assertSame('US', $capturedPayload['destination']['country']);
-        self::assertSame(10.0, $capturedPayload['shipping_amount']);
-        self::assertCount(1, $capturedPayload['lines']);
+
+        // v0.58 wire shape: address.zip5 + line_items[]. The legacy
+        // quote_id / destination / shipping_amount keys are gone; the
+        // engine ignored them anyway and they polluted the request body.
+        self::assertArrayHasKey('address', $capturedPayload);
+        self::assertSame('55403', $capturedPayload['address']['zip5']);
+        self::assertArrayNotHasKey('quote_id', $capturedPayload);
+        self::assertArrayNotHasKey('destination', $capturedPayload);
+        self::assertArrayNotHasKey('shipping_amount', $capturedPayload);
+        self::assertArrayNotHasKey('lines', $capturedPayload);
+
+        // Two line_items: the original product line + a synthesized
+        // shipping line with category='shipping'. Amounts MUST be decimal
+        // strings (engine quantizes per-jurisdiction in fixed-point).
+        self::assertCount(2, $capturedPayload['line_items']);
+        self::assertSame('100.00', $capturedPayload['line_items'][0]['amount']);
+        self::assertSame('general', $capturedPayload['line_items'][0]['category']);
+        self::assertSame('10.00', $capturedPayload['line_items'][1]['amount']);
+        self::assertSame('shipping', $capturedPayload['line_items'][1]['category']);
     }
 
     public function testBeforeCollectFailSoftSwallowsEngineError(): void

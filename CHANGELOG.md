@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-05-15
+
+### Fixed
+
+- **Bug A — Backend-model constructors broke Magento Interceptors.** `Model\Config\Backend\ApiUrl` (since v1.1.0) and `Model\Config\Backend\CategoryMapping` (new in v1.3.0) used a `(custom-dep, ...$parentArgs)` variadic ctor pattern. Magento's compiled `Interceptor` subclasses forward parent ctor args **by position**, so position 1 landed on our custom dep instead of `Context` — `bin/magento config:set` and admin-UI save crashed with a TypeError. Replaced both with the explicit Magento backend-model parent signature (`Context, Registry, ScopeConfigInterface, TypeListInterface, …, ?AbstractResource, ?AbstractDb, array`) and added the matching PHPStan stubs for those parent classes so the test suite can still be analysed without pulling Magento in. Surfaced by the live `setup:di:compile` on VM 914.
+- **Bug B — Outbound payload schema didn't match engine v0.58.0.** `Plugin\QuoteTotalsTaxPlugin::buildPayload()` emitted the legacy `{quote_id, destination, lines, shipping_amount}` shape; engine v0.58 only accepts the SDK-canonical `{address: {zip5}, line_items: [{amount, category}]}` shape (matching the Saleor / Medusa / OpenCart / Bagisto / Invoice Ninja connectors). Live $100 MN cart returned $0 tax silently under the default fail-soft policy. Refactored to emit the canonical shape: `address.zip5` extracted as the first 5 digits of the postcode; `line_items[]` entries with decimal-string amounts (engine quantizes per-jurisdiction in fixed-point, so floats lose precision); shipping folded in as a `category=shipping` line_item when non-zero.
+- **`Model\OstaxResponse` parser updated for v0.58 response shape.** Engine no longer emits per-line `line_id` (we synthesize a 0-based index key), and rates moved from `rate`/`jurisdictions[].rate` (decimal float like 0.06875) to `rate_pct` (percent string like "6.875"). New `extractRate()` helper accepts both shapes for forward/back compatibility, normalising to decimal so existing consumer code (`getEffectiveRatePercent`, `afterCollect` jurisdiction loop) keeps working unchanged.
+
+### Tests
+
+71 unit tests / 145 assertions (was 70). New `testFromArrayAcceptsRatePctStringFromEngineV058` covers the v0.58 wire shape end-to-end with a real-world MN cart fixture. `testBeforeCollectPrewarmsRegistryOnUsdUsCheckout` rewritten to assert the new `address`+`line_items` payload (incl. shipping line). Backend-model tests centralized through a `makeModel()` helper that takes the explicit ctor signature.
+
+### Compatibility
+
+No public API changes. Anyone deploying v1.3.1 on top of v1.3.0 sees: the admin UI save now actually works (Bug A) and live MN checkouts now return the expected ~$9.025 tax instead of $0 (Bug B). Backend-model integrations that custom-extended `ApiUrl` or `CategoryMapping` will need to update their own ctor signature to match — but anyone doing that was already crashed by Bug A so this is a strict improvement.
+
 ## [1.3.0] - 2026-05-15
 
 ### Added
