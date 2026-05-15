@@ -1,7 +1,7 @@
 # Current State — opensalestax-magento
 
-**Last updated:** 2026-05-15 (v1.3.2 shipped)
-**Status:** **v1.3.2 released.** Composer-installable Magento 2 module wired against the OpenSalesTax engine. Unit-tested (73 tests, all green on PHP 8.1 + 8.2 CI matrix). PHPStan level 8 + PHPCS (Magento2 standard) + composer audit all clean. v1.3.2 fixed Bug C (`etc/di.xml` totals plugin targeted a non-existent Magento class — latent since v0.1.0; surfaced by live VM 914 demo bootstrap); v1.3.1 fixed Bugs A+B (backend-model Interceptor ctor pattern; engine v0.58 payload schema); v1.3.0 added per-tax-class → OST-category mapping. **Anyone on v1.3.0 or v1.3.1 should upgrade to v1.3.2 immediately** — Bug C silently broke checkouts (every cart returned `tax_amount: 0`).
+**Last updated:** 2026-05-15 (v1.3.3 shipped)
+**Status:** **v1.3.3 released.** Composer-installable Magento 2 module wired against the OpenSalesTax engine. Unit-tested (74 tests, all green on PHP 8.1 + 8.2 CI matrix). PHPStan level 8 + PHPCS (Magento2 standard) + composer audit all clean. v1.3.3 fixed Bug D (plugin method arity didn't match target — `ArgumentCountError` on every checkout); v1.3.2 fixed Bug C (di.xml plugin target was non-existent class); v1.3.1 fixed Bugs A+B (backend-model Interceptor ctor pattern; engine v0.58 payload schema); v1.3.0 added per-tax-class → OST-category mapping. **Anyone on v1.3.0 / v1.3.1 / v1.3.2 should upgrade to v1.3.3 immediately** — v1.3.3 is the first release where Magento checkouts actually compute tax.
 
 ## What's shipped
 
@@ -30,6 +30,12 @@ Initial installable release: HTTP client, the two plugins, admin config, ADR-001
 - Bundled with the existing `restrict_to_public_ips` toggle (label updated to "Restrict and Pin Engine URL"). Default still off.
 - Closes the v1.1 caveat. Documented in `specs/security/audit-2026-05-13-v1.2.md`.
 - 63 unit tests (up from 54). NCLOC 695 → 747.
+
+### v1.3.3 (2026-05-15) — Bug D fix (plugin method arity)
+
+- **Bug D** — `QuoteTotalsTaxPlugin::beforeCollect` declared `(object $subject, object $shippingAssignment, object $total)` (1+2 args). Magento's compiled Interceptor uses the plugin signature to decide what to forward to the parent; the target `Magento\Tax\Model\Sales\Total\Quote\Tax::collect(Quote, ShippingAssignment, Total)` takes 3 args. Once Bug C unmasked the plugin in v1.3.2, every `collectTotals()` crashed with `ArgumentCountError`. Both `beforeCollect` and `afterCollect` now mirror the target's 3-arg shape exactly.
+- **`Test\Unit\Etc\PluginAritySignatureTest`** — generic regression coverage for the entire class of arity-mismatch bugs. Uses `ReflectionMethod` to walk every plugin's `before*`/`after*`/`around*` methods and asserts each declares the right number of parameters relative to the target method (looked up via a curated `TARGET_METHOD_ARITIES` map keyed by target class + method, with verifying `vendor/magento/...` path comments). Verified to fail on the historic 1+2 sig.
+- 74 unit tests / 157 assertions (was 73 / 153).
 
 ### v1.3.2 (2026-05-15) — Bug C fix (di.xml totals-plugin target)
 
@@ -95,4 +101,4 @@ Magento 2 `^2.4.6`. Adobe's lifecycle policy keeps 2.4.6 + 2.4.7 supported throu
 | `opensalestax-php/` | PHP SDK | shipped, private repo pending Packagist flip |
 | `opensalestax-saleor/` | Saleor Tax App | pre-alpha, specs only |
 | `opensalestax-vendure/` | Vendure plugin | pre-alpha, specs only |
-| `opensalestax-magento/` | **THIS** — Magento 2 module | **v1.3.2 shipped** (v1.3.0/v1.3.1 broken at runtime — upgrade) |
+| `opensalestax-magento/` | **THIS** — Magento 2 module | **v1.3.3 shipped** (v1.3.0/v1.3.1/v1.3.2 broken at runtime — upgrade) |
