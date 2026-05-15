@@ -1,7 +1,7 @@
 # Current State — opensalestax-magento
 
-**Last updated:** 2026-05-13 (v1.2.0 shipped)
-**Status:** **v1.2.0 released.** Composer-installable Magento 2 module wired against the OpenSalesTax engine. Unit-tested (63 tests, all green on PHP 8.1 + 8.2 CI matrix). SonarQube clean (0 open issues; A across all ratings). v1.2 closed the DNS-rebinding caveat from v1.1 via save-time IP pinning + runtime `CURLOPT_RESOLVE`.
+**Last updated:** 2026-05-15 (v1.3.0 shipped)
+**Status:** **v1.3.0 released.** Composer-installable Magento 2 module wired against the OpenSalesTax engine. Unit-tested (70 tests, all green on PHP 8.1 + 8.2 CI matrix). PHPStan level 8 + PHPCS (Magento2 standard) + composer audit all clean. v1.3 added per-tax-class → OST-category mapping (mirrors WooCom v0.3.3 / Odoo v0.1.13 pattern); v1.2 closed the DNS-rebinding caveat via save-time IP pinning + runtime `CURLOPT_RESOLVE`.
 
 ## What's shipped
 
@@ -30,6 +30,15 @@ Initial installable release: HTTP client, the two plugins, admin config, ADR-001
 - Bundled with the existing `restrict_to_public_ips` toggle (label updated to "Restrict and Pin Engine URL"). Default still off.
 - Closes the v1.1 caveat. Documented in `specs/security/audit-2026-05-13-v1.2.md`.
 - 63 unit tests (up from 54). NCLOC 695 → 747.
+
+### v1.3.0 (2026-05-15) — Tax-class → OST-category mapping
+
+- `OstCategory` canonical 7-value vocabulary (ADR-005 cross-portfolio): `general`, `clothing`, `groceries`, `prescription_drugs`, `prepared_food`, `digital_goods`, `''` (skip).
+- `CategoryMapping` backend model — admin posts JSON `{tax_class_id: ost_category, ...}`; backend validates + serializes for `core_config_data`.
+- `Config::resolveCategory(int $taxClassId)` resolves the mapped category at request time; defaults to `general` when unmapped.
+- `QuoteTotalsTaxPlugin` now sends per-line OST categories in `POST /v1/calculate` (was hardcoded `general` before).
+- Admin UI: new "Category Mapping" group under *Stores → Configuration → Sales → OpenSalesTax*.
+- 70 unit tests (up from 63). No breaking changes — merchants without a configured mapping see identical v1.2 behavior.
 
 ## Where the upstream engine is
 
@@ -73,4 +82,4 @@ Magento 2 `^2.4.6`. Adobe's lifecycle policy keeps 2.4.6 + 2.4.7 supported throu
 | `opensalestax-php/` | PHP SDK | shipped, private repo pending Packagist flip |
 | `opensalestax-saleor/` | Saleor Tax App | pre-alpha, specs only |
 | `opensalestax-vendure/` | Vendure plugin | pre-alpha, specs only |
-| `opensalestax-magento/` | **THIS** — Magento 2 module | **v1.0.0 shipped** |
+| `opensalestax-magento/` | **THIS** — Magento 2 module | **v1.3.0 shipped** |

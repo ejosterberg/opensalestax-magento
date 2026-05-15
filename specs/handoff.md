@@ -2,9 +2,9 @@
 
 > **Read first if you're a fresh agent.** Constitution + current state + this file are the canonical bring-up sequence.
 
-## You are here — 2026-05-13 (v1.0.0 shipped)
+## You are here — 2026-05-15 (v1.3.0 shipped)
 
-The Magento 2 module shipped its first production release on 2026-05-13. The v1.0.0 tag is on `main`, GitHub release v1.0.0 is published, SonarQube dashboard is clean, all unit tests green.
+The Magento 2 module shipped four releases (v1.0.0 → v1.3.0). Latest: v1.3.0 added per-tax-class → OST-category mapping. CI green on both PHP 8.1 + 8.2 (PHPUnit / PHPStan level 8 / PHPCS / composer audit). 70 unit tests.
 
 ## What the next session should pick up
 
@@ -23,18 +23,26 @@ After the demo lands, update `specs/current-state.md` and tick off D2-D7 in the 
 
 If not done at stage 07: open <https://packagist.org/packages/submit> in a logged-in browser, paste `https://github.com/ejosterberg/opensalestax-magento`, click Submit. Configure the GitHub webhook so future tags auto-publish. Verify with `composer require ejosterberg/module-opensalestax --dry-run` on a clean Magento install.
 
-### 3. v1.3 polish queue (was v1.2 deferred)
+### 3. v1.4 polish queue (was v1.3 deferred)
 
 In priority order:
 
 - **Surface the pinned IP in the admin UI** (v1.2 cosmetic carry-over). Add a read-only display field under "Restrict and Pin Engine URL" that shows the currently-pinned IP. Helpful when troubleshooting a stale pin after engine IP rotation.
 - **TLS certificate pinning** for HTTPS engines. v1.2 relies on standard cURL cert verification against the original hostname. A merchant on mutual TLS could opt into pinning a specific cert thumbprint.
 - **PHP 8.3 support**. Blocked on `magento/magento-coding-standard` releasing a version that supports 8.3. Re-add to the CI matrix once the dep is bumped.
-- **Tax-class → OST-category mapping**. Currently every line is sent as category `general`. Match the WooCom v0.3.3 / Odoo v0.1.13 pattern: admin UI maps Magento tax classes to OST categories.
-- **Per-state nexus filter** (matches Odoo v0.3.0). Only call the engine for states where the merchant has nexus.
+- **Per-state nexus filter** (matches Vendure v1.2 / Odoo v0.3.0). Only call the engine for states where the merchant has nexus.
+- **Dynamic-rows widget for category mapping**. v1.3.0 ships a JSON textarea — usable but ugly. CategoryMapping backend model already accepts the rows-array shape; the UI swap is the remaining work.
+- **i18n for category labels**. v1.3 ships English-only labels by design; wrap in `__()` when the dropdown UI lands.
 - **Operator telemetry**. Last successful calc, failure streak, threshold-crossing alert via Magento's system message framework.
 - **Customer-group exemption-certificate hooks**. Magento has a built-in customer-group → tax-class mapping; expose an opt-out flag per group.
 - **MFTF end-to-end test suite**. Heavyweight; deferred from v1.0 because the demo deployment covers the happy path.
+
+### v1.3 shipped (tax-class → OST-category mapping)
+
+- **`OstCategory` canonical 7-value vocabulary** (ADR-005). `Model/Source/OstCategory.php`.
+- **`CategoryMapping` backend model** at `osstax/general/category_mapping`. Accepts JSON, validates, JSON-encodes.
+- **`Config::resolveCategory(int $taxClassId)`** maps tax class IDs at request time; defaults to `general`.
+- **`QuoteTotalsTaxPlugin`** now sends per-line OST categories in `POST /v1/calculate`.
 
 ### v1.2 shipped (DNS rebinding closed)
 
