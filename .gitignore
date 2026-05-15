@@ -23,3 +23,6 @@ Thumbs.db
 
 # Local Sonar working tree (created by sonar-scanner)
 /.scannerwork/
+
+# Session handoff (not part of the project; written when a Claude session relinquishes)
+/HANDOFF-TO-CAPTAIN.md

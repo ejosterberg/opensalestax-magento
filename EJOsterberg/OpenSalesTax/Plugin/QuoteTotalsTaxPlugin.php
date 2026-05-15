@@ -171,6 +171,10 @@ class QuoteTotalsTaxPlugin
      */
     private function buildPayload(int $quoteId, object $shippingAddress, array $items, object $total): array
     {
+        // Cache the mapping once per buildPayload call (one quote-total recompute).
+        // Avoids N scope_config reads + JSON-decode passes when a quote has N lines.
+        $categoryMapping = $this->config->getCategoryMapping();
+
         $lines = [];
         foreach ($items as $item) {
             $lineId = (string)(method_exists($item, 'getId') ? $item->getId() : '');
@@ -179,11 +183,27 @@ class QuoteTotalsTaxPlugin
             }
             $amount = (float)(method_exists($item, 'getRowTotal') ? $item->getRowTotal() : 0.0);
             $quantity = (float)(method_exists($item, 'getQty') ? $item->getQty() : 1.0);
+
+            // Resolve OST category from the line's Magento tax class. Try the
+            // item's getTaxClassId(); fall back to the underlying product if the
+            // item is wrapping one. Unknown / zero / unmapped → DEFAULT_CATEGORY.
+            $taxClassId = 0;
+            if (method_exists($item, 'getTaxClassId')) {
+                $taxClassId = (int)$item->getTaxClassId();
+            }
+            if ($taxClassId === 0 && method_exists($item, 'getProduct')) {
+                $product = $item->getProduct();
+                if (is_object($product) && method_exists($product, 'getTaxClassId')) {
+                    $taxClassId = (int)$product->getTaxClassId();
+                }
+            }
+            $category = $categoryMapping[$taxClassId] ?? \EJOsterberg\OpenSalesTax\Model\Config::DEFAULT_CATEGORY;
+
             $lines[] = [
                 'line_id'  => $lineId,
                 'amount'   => $amount,
                 'quantity' => $quantity,
-                'category' => 'general',
+                'category' => $category,
             ];
         }
 

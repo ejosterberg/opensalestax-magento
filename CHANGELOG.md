@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-05-15
+
+### Added
+- **Tax class to OST category mapping.** Map each Magento product tax class to an OpenSalesTax category so the engine applies the right per-state rules (clothing exemptions, grocery rates, prescription-drug exemptions, etc.). Stored as a JSON object in `core_config_data` under `osstax/category_mapping/mapping`, scoped per default/website/store like every other module setting.
+- New `EJOsterberg\OpenSalesTax\Model\Source\OstCategory` with the canonical 7-value OST category vocabulary aligned with ADR-005 from `opensalestax-vendure` (`general`, `clothing`, `groceries`, `prescription_drugs`, `prepared_food`, `digital_goods`, `''` for skip).
+- New `EJOsterberg\OpenSalesTax\Model\Config\Backend\CategoryMapping` backend model validates posted mappings (numeric tax class id, allowlisted OST category) and JSON-serializes for storage. Accepts both a JSON-string post (v1.3.0 textarea UI) and the dynamic-rows array post shape (v1.3.1+ widget).
+- New `Config::getCategoryMapping()` and `Config::resolveCategory(int $taxClassId): string` methods. The latter is the hot-path helper.
+- 7 new unit tests (70 total, up from 63): 2 in OstCategoryTest, 5 in ConfigTest. The CategoryMapping backend test + dropdown-UI block tests are deferred to v1.3.1 alongside the dynamic-rows widget.
+- New admin UI: Stores → Configuration → Sales → Tax → OpenSalesTax → **Category Mapping** group with a JSON-textarea field. v1.3.1 will replace the textarea with a dropdown-driven dynamic-rows widget.
+
+### Changed
+- `QuoteTotalsTaxPlugin::buildPayload()` now resolves each quote item's Magento tax class to its mapped OST category (or `general` when unmapped) instead of unconditionally sending `general`. Reads the mapping once per buildPayload call and caches it inline — no per-line scope_config hits.
+
+### Notes
+- Non-breaking from v1.2.0. Merchants who don't configure any mapping see v1.2 behavior (every line is sent as `general`).
+- No schema migration; the mapping lives in `core_config_data`. `etc/module.xml` `setup_version` stays at 0.1.0 (the Magento schema version is independent from the package semver — Magento only bumps it when an `InstallSchema` / `UpgradeSchema` lands).
+- Constitution §10 still applies — calculation only, no filing.
+
 ## [1.2.0] - 2026-05-13
 
 ### Added

@@ -31,6 +31,15 @@
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
             </group>
+            <group id="category_mapping" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Category Mapping</label>
+                <comment><![CDATA[Map each Magento product tax class to an OpenSalesTax category so the engine applies the correct per-state rules (clothing exemptions, grocery rates, prescription-drug exemptions, etc.). Stored as a JSON object in <code>core_config_data</code>. Tax classes not listed fall back to <code>general</code>. Set a value to empty string (<code>""</code>) to mark a tax class non-taxable. An inline admin editor with dropdowns lands in a v1.3.1 follow-up.]]></comment>
+                <field id="mapping" translate="label comment" type="textarea" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Tax Class to OST Category Mapping (JSON)</label>
+                    <comment><![CDATA[JSON object mapping Magento tax class id to OST category. Valid OST categories: <code>general</code>, <code>clothing</code>, <code>groceries</code>, <code>prescription_drugs</code>, <code>prepared_food</code>, <code>digital_goods</code>, or <code>""</code> (skip line / non-taxable). Example: <code>{"2":"clothing","3":"groceries","5":"digital_goods","6":""}</code>.]]></comment>
+                    <backend_model>EJOsterberg\OpenSalesTax\Model\Config\Backend\CategoryMapping</backend_model>
+                </field>
+            </group>
         </section>
     </system>
 </config>

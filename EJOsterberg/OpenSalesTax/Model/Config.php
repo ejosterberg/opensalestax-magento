@@ -6,6 +6,7 @@ namespace EJOsterberg\OpenSalesTax\Model;
 
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
+use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Store\Model\ScopeInterface;
 
 /**
@@ -22,10 +23,15 @@ class Config
     public const PATH_FAIL_HARD = 'osstax/general/fail_hard';
     public const PATH_RESTRICT_TO_PUBLIC_IPS = 'osstax/general/restrict_to_public_ips';
     public const PATH_PINNED_IP = 'osstax/general/api_url_pinned_ip';
+    public const PATH_CATEGORY_MAPPING = 'osstax/category_mapping/mapping';
+
+    /** Default OST category when a line's tax class is unmapped (per ADR-005). */
+    public const DEFAULT_CATEGORY = 'general';
 
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
-        private readonly EncryptorInterface $encryptor
+        private readonly EncryptorInterface $encryptor,
+        private readonly Json $json
     ) {
     }
 
@@ -111,5 +117,59 @@ class Config
             $scopeCode
         );
         return is_string($raw) ? $raw : '';
+    }
+
+    /**
+     * Returns the merchant-configured map of `magento_tax_class_id` to OST
+     * category. Returns an empty array when unset, malformed, or the stored
+     * value is not a JSON object — fail-soft, never throws.
+     *
+     * @return array<int, string>
+     */
+    public function getCategoryMapping(?string $scopeCode = null): array
+    {
+        $raw = $this->scopeConfig->getValue(
+            self::PATH_CATEGORY_MAPPING,
+            ScopeInterface::SCOPE_STORE,
+            $scopeCode
+        );
+        if (!is_string($raw) || $raw === '') {
+            return [];
+        }
+        try {
+            $decoded = $this->json->unserialize($raw);
+        } catch (\InvalidArgumentException $e) {
+            return [];
+        }
+        if (!is_array($decoded)) {
+            return [];
+        }
+        $out = [];
+        foreach ($decoded as $taxClassId => $ostCategory) {
+            if (!is_string($ostCategory)) {
+                continue;
+            }
+            $id = (int)$taxClassId;
+            if ($id <= 0) {
+                continue;
+            }
+            $out[$id] = $ostCategory;
+        }
+        return $out;
+    }
+
+    /**
+     * Resolve the OST category to send for a given Magento product tax class.
+     * Falls back to `DEFAULT_CATEGORY` ('general') when unmapped.
+     *
+     * Hot path — called for every line on every quote-total recompute.
+     * Callers should cache the mapping array once per request lifecycle
+     * via `getCategoryMapping()` rather than calling this method
+     * repeatedly inside a tight loop.
+     */
+    public function resolveCategory(int $taxClassId, ?string $scopeCode = null): string
+    {
+        $mapping = $this->getCategoryMapping($scopeCode);
+        return $mapping[$taxClassId] ?? self::DEFAULT_CATEGORY;
     }
 }

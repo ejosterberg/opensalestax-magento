@@ -7,6 +7,7 @@ namespace EJOsterberg\OpenSalesTax\Test\Unit\Model;
 use EJOsterberg\OpenSalesTax\Model\Config;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
+use Magento\Framework\Serialize\Serializer\Json;
 use PHPUnit\Framework\TestCase;
 
 final class ConfigTest extends TestCase
@@ -18,7 +19,7 @@ final class ConfigTest extends TestCase
             ->with(Config::PATH_API_URL)
             ->willReturn('https://ost.example.com/');
 
-        $config = new Config($scopeConfig, $this->createMock(EncryptorInterface::class));
+        $config = new Config($scopeConfig, $this->createMock(EncryptorInterface::class), $this->createMock(Json::class));
 
         self::assertSame('https://ost.example.com', $config->getApiUrl());
     }
@@ -28,7 +29,7 @@ final class ConfigTest extends TestCase
         $scopeConfig = $this->createMock(ScopeConfigInterface::class);
         $scopeConfig->method('getValue')->willReturn(null);
 
-        $config = new Config($scopeConfig, $this->createMock(EncryptorInterface::class));
+        $config = new Config($scopeConfig, $this->createMock(EncryptorInterface::class), $this->createMock(Json::class));
 
         self::assertSame('', $config->getApiUrl());
     }
@@ -69,7 +70,7 @@ final class ConfigTest extends TestCase
             ->with(Config::PATH_FAIL_HARD)
             ->willReturn(true);
 
-        $config = new Config($scopeConfig, $this->createMock(EncryptorInterface::class));
+        $config = new Config($scopeConfig, $this->createMock(EncryptorInterface::class), $this->createMock(Json::class));
 
         self::assertTrue($config->isFailHard());
     }
@@ -79,7 +80,7 @@ final class ConfigTest extends TestCase
         $scopeConfig = $this->createMock(ScopeConfigInterface::class);
         $scopeConfig->method('getValue')->willReturnOnConsecutiveCalls('https://ost.example.com', '');
 
-        $config = new Config($scopeConfig, $this->createMock(EncryptorInterface::class));
+        $config = new Config($scopeConfig, $this->createMock(EncryptorInterface::class), $this->createMock(Json::class));
 
         self::assertTrue($config->isConfigured());
         self::assertFalse($config->isConfigured());
@@ -93,7 +94,7 @@ final class ConfigTest extends TestCase
                 [Config::PATH_RESTRICT_TO_PUBLIC_IPS, 'store', null, true],
             ]);
 
-        $config = new Config($scopeConfig, $this->createMock(EncryptorInterface::class));
+        $config = new Config($scopeConfig, $this->createMock(EncryptorInterface::class), $this->createMock(Json::class));
 
         self::assertTrue($config->isRestrictToPublicIps());
     }
@@ -105,7 +106,7 @@ final class ConfigTest extends TestCase
             ->with(Config::PATH_PINNED_IP)
             ->willReturn('8.8.8.8');
 
-        $config = new Config($scopeConfig, $this->createMock(EncryptorInterface::class));
+        $config = new Config($scopeConfig, $this->createMock(EncryptorInterface::class), $this->createMock(Json::class));
 
         self::assertSame('8.8.8.8', $config->getPinnedIp());
     }
@@ -115,8 +116,77 @@ final class ConfigTest extends TestCase
         $scopeConfig = $this->createMock(ScopeConfigInterface::class);
         $scopeConfig->method('getValue')->willReturn(null);
 
-        $config = new Config($scopeConfig, $this->createMock(EncryptorInterface::class));
+        $config = new Config($scopeConfig, $this->createMock(EncryptorInterface::class), $this->createMock(Json::class));
 
         self::assertSame('', $config->getPinnedIp());
+    }
+
+    public function testGetCategoryMappingReturnsEmptyArrayWhenUnset(): void
+    {
+        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
+        $scopeConfig->method('getValue')
+            ->with(Config::PATH_CATEGORY_MAPPING)
+            ->willReturn(null);
+        $config = new Config($scopeConfig, $this->createMock(EncryptorInterface::class), $this->createMock(Json::class));
+
+        self::assertSame([], $config->getCategoryMapping());
+    }
+
+    public function testGetCategoryMappingReturnsEmptyArrayOnMalformedJson(): void
+    {
+        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
+        $scopeConfig->method('getValue')
+            ->with(Config::PATH_CATEGORY_MAPPING)
+            ->willReturn('not json');
+        $json = $this->createMock(Json::class);
+        $json->method('unserialize')->willThrowException(new \InvalidArgumentException('bad json'));
+        $config = new Config($scopeConfig, $this->createMock(EncryptorInterface::class), $json);
+
+        self::assertSame([], $config->getCategoryMapping());
+    }
+
+    public function testGetCategoryMappingFiltersBadEntries(): void
+    {
+        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
+        $scopeConfig->method('getValue')
+            ->with(Config::PATH_CATEGORY_MAPPING)
+            ->willReturn('{"2":"clothing","0":"general","7":"groceries","x":"digital_goods"}');
+        $json = $this->createMock(Json::class);
+        $json->method('unserialize')->willReturn(['2' => 'clothing', '0' => 'general', '7' => 'groceries', 'x' => 'digital_goods']);
+        $config = new Config($scopeConfig, $this->createMock(EncryptorInterface::class), $json);
+
+        $result = $config->getCategoryMapping();
+        // 0 and 'x' should be dropped (non-positive int / non-numeric)
+        self::assertArrayHasKey(2, $result);
+        self::assertSame('clothing', $result[2]);
+        self::assertArrayHasKey(7, $result);
+        self::assertSame('groceries', $result[7]);
+        self::assertArrayNotHasKey(0, $result);
+    }
+
+    public function testResolveCategoryReturnsMappedValue(): void
+    {
+        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
+        $scopeConfig->method('getValue')
+            ->with(Config::PATH_CATEGORY_MAPPING)
+            ->willReturn('{"2":"clothing"}');
+        $json = $this->createMock(Json::class);
+        $json->method('unserialize')->willReturn(['2' => 'clothing']);
+        $config = new Config($scopeConfig, $this->createMock(EncryptorInterface::class), $json);
+
+        self::assertSame('clothing', $config->resolveCategory(2));
+    }
+
+    public function testResolveCategoryFallsBackToGeneralForUnmappedClass(): void
+    {
+        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
+        $scopeConfig->method('getValue')
+            ->with(Config::PATH_CATEGORY_MAPPING)
+            ->willReturn('{"2":"clothing"}');
+        $json = $this->createMock(Json::class);
+        $json->method('unserialize')->willReturn(['2' => 'clothing']);
+        $config = new Config($scopeConfig, $this->createMock(EncryptorInterface::class), $json);
+
+        self::assertSame('general', $config->resolveCategory(99));
     }
 }
