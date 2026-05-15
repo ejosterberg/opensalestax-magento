@@ -5,62 +5,44 @@ declare(strict_types=1);
 namespace EJOsterberg\OpenSalesTax\Model\Config\Backend;
 
 use EJOsterberg\OpenSalesTax\Model\Source\OstCategory;
-use Magento\Framework\App\Cache\TypeListInterface;
-use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Config\Value;
-use Magento\Framework\Data\Collection\AbstractDb;
 use Magento\Framework\Exception\LocalizedException;
-use Magento\Framework\Model\Context;
-use Magento\Framework\Model\ResourceModel\AbstractResource;
-use Magento\Framework\Registry;
 use Magento\Framework\Serialize\Serializer\Json;
-use Magento\Framework\Event\ManagerInterface;
 
 /**
  * Backend model for the Tax-Class → OST-Category Mapping admin field.
  *
- * Admin posts a dynamic-rows table:
- *   [
- *     'row_42' => ['tax_class_id' => '2', 'ost_category' => 'clothing'],
- *     'row_99' => ['tax_class_id' => '3', 'ost_category' => 'groceries'],
- *     ...
- *   ]
+ * Accepts two input shapes (defense-in-depth — both paths normalize to
+ * the same on-disk JSON object):
+ *   1. JSON string from the v1.3.0 textarea UI:
+ *        `{"2":"clothing","3":"groceries"}`
+ *   2. Array of rows from a future dynamic-rows widget:
+ *        `['row_42' => ['tax_class_id'=>'2','ost_category'=>'clothing']]`
  *
- * `beforeSave()` validates each row + collapses to a flat
- *   ['2' => 'clothing', '3' => 'groceries']
- * map and JSON-encodes for storage in `core_config_data`.
+ * Invalid posts throw `LocalizedException` — Magento surfaces these as
+ * red banners on the admin form. The dropdown UI should never produce
+ * them; this is defense against a tampered form post.
  *
- * `afterLoad()` decodes the JSON back into the row-form the dynamic-
- * rows widget expects on next admin page render.
- *
- * Invalid posts throw `LocalizedException` — Magento surfaces these
- * as red banners on the admin form. The dropdown UI should never
- * produce them; defense-in-depth catches a tampered form.
+ * Constructor uses the `...$parentArgs` pattern (matches ApiUrl) so we
+ * don't have to redeclare Magento's full backend-model DI signature
+ * (`Context`, `Registry`, etc.) — those classes aren't stubbed for
+ * PHPStan and pulling them in would force a Marketplace composer
+ * dependency.
  */
 class CategoryMapping extends Value
 {
+    /**
+     * @param mixed ...$parentArgs Pass-through to Magento\Framework\App\Config\Value.
+     */
     public function __construct(
-        Context $context,
-        Registry $registry,
-        ScopeConfigInterface $config,
-        TypeListInterface $cacheTypeList,
-        private readonly Json $json,
-        ?AbstractResource $resource = null,
-        ?AbstractDb $resourceCollection = null,
-        array $data = []
+        protected readonly Json $json,
+        ...$parentArgs
     ) {
-        parent::__construct($context, $registry, $config, $cacheTypeList, $resource, $resourceCollection, $data);
+        parent::__construct(...$parentArgs);
     }
 
     /**
      * Validate + serialize before persisting.
-     *
-     * Accepts TWO input shapes:
-     *  1. JSON string (v1.3.0 textarea UI): merchant posts e.g.
-     *     `{"2":"clothing","3":"groceries"}`.
-     *  2. Array of rows (v1.3.1+ dynamic-rows widget): merchant posts
-     *     `['row_42' => ['tax_class_id'=>'2', 'ost_category'=>'clothing']]`.
-     * Both end up serialized to the same JSON-object on-disk shape.
      */
     public function beforeSave(): self
     {
@@ -71,7 +53,8 @@ class CategoryMapping extends Value
             $value = trim($value);
             if ($value === '') {
                 $this->setValue('');
-                return parent::beforeSave();
+                parent::beforeSave();
+                return $this;
             }
             try {
                 $decoded = $this->json->unserialize($value);
@@ -87,13 +70,15 @@ class CategoryMapping extends Value
             }
             $flat = $this->validateAndNormalize($decoded);
             $this->setValue($this->json->serialize($flat));
-            return parent::beforeSave();
+            parent::beforeSave();
+            return $this;
         }
 
-        // Path 2: dynamic-rows widget post (v1.3.1+)
+        // Path 2: dynamic-rows widget post (future v1.3.1+)
         if (!is_array($value)) {
             $this->setValue('');
-            return parent::beforeSave();
+            parent::beforeSave();
+            return $this;
         }
 
         $valid = OstCategory::getValidValues();
@@ -109,11 +94,11 @@ class CategoryMapping extends Value
                 continue;
             }
             if (!ctype_digit($taxClassId) || (int)$taxClassId <= 0) {
-                $invalid[] = sprintf('row "%s": tax class id must be a positive integer (got "%s")', $rowKey, $taxClassId);
+                $invalid[] = sprintf('row "%s": tax class id must be a positive integer (got "%s")', (string)$rowKey, $taxClassId);
                 continue;
             }
             if (!in_array($ostCategory, $valid, true)) {
-                $invalid[] = sprintf('row "%s": "%s" is not a valid OST category', $rowKey, $ostCategory);
+                $invalid[] = sprintf('row "%s": "%s" is not a valid OST category', (string)$rowKey, $ostCategory);
                 continue;
             }
             $flat[$taxClassId] = $ostCategory;
@@ -129,7 +114,8 @@ class CategoryMapping extends Value
         }
 
         $this->setValue($this->json->serialize($flat));
-        return parent::beforeSave();
+        parent::beforeSave();
+        return $this;
     }
 
     /**
@@ -137,7 +123,7 @@ class CategoryMapping extends Value
      * `tax_class_id => ost_category` shape used for storage.
      *
      * @param array<int|string, mixed> $decoded
-     * @return array<string, string>
+     * @return array<int|string, string>
      */
     private function validateAndNormalize(array $decoded): array
     {
@@ -181,53 +167,5 @@ class CategoryMapping extends Value
             static fn (string $c): string => $c === '' ? "'' (skip)" : $c,
             $valid
         ));
-    }
-
-    /**
-     * For the v1.3.0 textarea UI, return the JSON string as-is so the
-     * admin sees their saved JSON in the textarea on form load.
-     *
-     * (When v1.3.1 adds the dynamic-rows widget, swap this to decode
-     * into the row shape the widget expects.)
-     */
-    public function afterLoad(): self
-    {
-        // No-op for the textarea UI — the stored JSON string IS what
-        // the textarea renders.
-        return parent::afterLoad();
-    }
-
-    /**
-     * @deprecated Not used by the v1.3.0 textarea UI; kept for v1.3.1 widget.
-     */
-    private function _afterLoadForDynamicRowsWidget(): self
-    {
-        $value = $this->getValue();
-        if (!is_string($value) || $value === '') {
-            $this->setValue([]);
-            return parent::afterLoad();
-        }
-        try {
-            $decoded = $this->json->unserialize($value);
-        } catch (\InvalidArgumentException $e) {
-            $this->setValue([]);
-            return parent::afterLoad();
-        }
-        if (!is_array($decoded)) {
-            $this->setValue([]);
-            return parent::afterLoad();
-        }
-        $rows = [];
-        foreach ($decoded as $taxClassId => $ostCategory) {
-            if (!is_string($ostCategory)) {
-                continue;
-            }
-            $rows[] = [
-                'tax_class_id' => (string)$taxClassId,
-                'ost_category' => $ostCategory,
-            ];
-        }
-        $this->setValue($rows);
-        return parent::afterLoad();
     }
 }
