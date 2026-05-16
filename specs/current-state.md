@@ -1,7 +1,7 @@
 # Current State — opensalestax-magento
 
-**Last updated:** 2026-05-15 (v1.3.3 shipped)
-**Status:** **v1.3.3 released.** Composer-installable Magento 2 module wired against the OpenSalesTax engine. Unit-tested (74 tests, all green on PHP 8.1 + 8.2 CI matrix). PHPStan level 8 + PHPCS (Magento2 standard) + composer audit all clean. v1.3.3 fixed Bug D (plugin method arity didn't match target — `ArgumentCountError` on every checkout); v1.3.2 fixed Bug C (di.xml plugin target was non-existent class); v1.3.1 fixed Bugs A+B (backend-model Interceptor ctor pattern; engine v0.58 payload schema); v1.3.0 added per-tax-class → OST-category mapping. **Anyone on v1.3.0 / v1.3.1 / v1.3.2 should upgrade to v1.3.3 immediately** — v1.3.3 is the first release where Magento checkouts actually compute tax.
+**Last updated:** 2026-05-15 (v1.3.5 shipped)
+**Status:** **v1.3.5 released.** Composer-installable Magento 2 module wired against the OpenSalesTax engine. Unit-tested (76 tests, all green on PHP 8.1 + 8.2 CI matrix). PHPStan level 8 + PHPCS (Magento2 standard) + composer audit all clean. v1.3.5 fixed Bug F (`afterCollect` method_exists trap + missing canonical setTaxAmount writes — without this, the engine response never landed on the quote totals); v1.3.4 fixed Bug E (method_exists vs __call on Magento Interceptor magic getters); v1.3.3 fixed Bug D (plugin method arity); v1.3.2 fixed Bug C (di.xml plugin target was non-existent class); v1.3.1 fixed Bugs A+B (Interceptor ctor pattern + engine v0.58 payload schema); v1.3.0 added per-tax-class → OST-category mapping. **Anyone on v1.3.0–v1.3.4 should upgrade to v1.3.5 immediately** — v1.3.5 is the first release where the engine response actually drives Magento's cart totals.
 
 ## What's shipped
 
@@ -30,6 +30,17 @@ Initial installable release: HTTP client, the two plugins, admin config, ADR-001
 - Bundled with the existing `restrict_to_public_ips` toggle (label updated to "Restrict and Pin Engine URL"). Default still off.
 - Closes the v1.1 caveat. Documented in `specs/security/audit-2026-05-13-v1.2.md`.
 - 63 unit tests (up from 54). NCLOC 695 → 747.
+
+### v1.3.5 (2026-05-15) — Bug F fix (afterCollect writes the actual tax amount)
+
+- **Bug F #1** — `afterCollect` had the same `method_exists` vs `__call` trap as Bug E at two more sites (`getId` on Quote + `setAppliedTaxes` on Total). Swapped to `is_callable()`.
+- **Bug F #2 (the big one)** — `afterCollect` wrote `setAppliedTaxes` (per-jurisdiction breakdown) but NEVER `setTaxAmount` / `setBaseTaxAmount` / `setTotalAmount('tax', X)` / `setBaseTotalAmount('tax', X)`. Magento's grand-total roll-up + `Address::getTaxAmount()` read from THOSE setters, not from `applied_taxes`. Latent since v0.1.0; masked by every prior bug in the chain. Added canonical writes per `vendor/magento/module-tax/Model/Sales/Total/Quote/Tax::collect()`.
+- 76 tests / 179 assertions (was 75 / 165). New regression test `testAfterCollectWritesTaxAmountThroughMagicCallSetters` covers the case where `$total` exposes setters only via `__call`.
+
+### v1.3.4 (2026-05-15) — Bug E fix (method_exists vs __call in beforeCollect)
+
+- **Bug E** — Magento Interceptor magic getters routed via `__call` → `method_exists()` returns false → defensive ternaries silently bailed. Five `method_exists()` → `is_callable([$x, 'getFoo'])` swaps in `beforeCollect`. (Bug F later showed `afterCollect` had the same trap at two more sites.)
+- 75 tests / 165 assertions. New regression test using anonymous classes with `__call`-only getters.
 
 ### v1.3.3 (2026-05-15) — Bug D fix (plugin method arity)
 
@@ -101,4 +112,4 @@ Magento 2 `^2.4.6`. Adobe's lifecycle policy keeps 2.4.6 + 2.4.7 supported throu
 | `opensalestax-php/` | PHP SDK | shipped, private repo pending Packagist flip |
 | `opensalestax-saleor/` | Saleor Tax App | pre-alpha, specs only |
 | `opensalestax-vendure/` | Vendure plugin | pre-alpha, specs only |
-| `opensalestax-magento/` | **THIS** — Magento 2 module | **v1.3.3 shipped** (v1.3.0/v1.3.1/v1.3.2 broken at runtime — upgrade) |
+| `opensalestax-magento/` | **THIS** — Magento 2 module | **v1.3.5 shipped** (v1.3.0–v1.3.4 broken at runtime — upgrade) |

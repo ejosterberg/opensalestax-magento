@@ -27,9 +27,9 @@ and in the v1.3.2 CHANGELOG entry.
 
 - Container path uses an `appdata` volume, NOT a bind mount, so host `git checkout` doesn't flow through. The re-verify subagent has been working around with `docker cp`. A future bootstrap-doc improvement: switch to a bind mount so source updates propagate naturally.
 
-## You are here — 2026-05-15 (v1.3.3 shipped)
+## You are here — 2026-05-15 (v1.3.5 shipped)
 
-The Magento 2 module shipped seven releases (v1.0.0 → v1.3.3). Latest: v1.3.3 fixed Bug D (plugin method arity didn't match target — `ArgumentCountError` on every checkout); v1.3.2 fixed Bug C (di.xml plugin target was non-existent class); v1.3.1 fixed Bugs A+B (Interceptor ctor + engine v0.58 payload); v1.3.0 added per-tax-class → OST-category mapping. CI green on both PHP 8.1 + 8.2 (PHPUnit / PHPStan level 8 / PHPCS / composer audit). 74 unit tests.
+The Magento 2 module shipped eight releases (v1.0.0 → v1.3.5). Latest: v1.3.5 fixed Bug F (afterCollect method_exists + missing setTaxAmount writes — the engine response now actually drives cart totals); v1.3.4 fixed Bug E (method_exists vs __call on Interceptor magic getters); v1.3.3 fixed Bug D (plugin method arity didn't match target — `ArgumentCountError` on every checkout); v1.3.2 fixed Bug C (di.xml plugin target was non-existent class); v1.3.1 fixed Bugs A+B (Interceptor ctor + engine v0.58 payload); v1.3.0 added per-tax-class → OST-category mapping. CI green on both PHP 8.1 + 8.2 (PHPUnit / PHPStan level 8 / PHPCS / composer audit). 76 unit tests.
 
 ## What the next session should pick up
 
