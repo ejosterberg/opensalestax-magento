@@ -1,6 +1,6 @@
 # Demo deployment — magento-demo VM
 
-**Status (2026-05-15):** Magento 2.4.7-p3 bootstrapped on VM 914 via markshust devbox. OST module v1.3.1 installed via Composer path-repo, enabled, configured against the shared engine. Live MN engine math verified ($100/55403 → $9.025 tax via direct API; $110 cart with $10 shipping → $9.9275 tax). Magento end-to-end checkout via the Magento UI is pending v1.3.1 re-deploy on the VM. **Both v1.3.0 surface bugs are fixed in v1.3.1** (see "Bug history" below).
+**Status (2026-05-16):** ✅ **All D1-D6 closed.** Magento 2.4.7-p3 + OST module v1.3.5 running on VM 914. End-to-end `collectTotals()` on a real persisted MN Quote returns `$ship->getTaxAmount() = $9.4763` ($100 product + $5 shipping, 8.5% combined MN rate over 6 jurisdictions). Reproducible across two back-to-back runs. The six-bug chain (A→B→C→D→E→F) is closed in v1.3.5 — see "Bug history" below for the full post-mortem.
 
 ## Infrastructure
 
@@ -150,14 +150,14 @@ The end-to-end checkout requires a browser. Eric runs this manually:
 
 ## Stage 05 status against success criteria
 
-| ID | Criterion | Status (2026-05-15 after v1.3.1) |
+| ID | Criterion | Status (2026-05-16 after v1.3.5 verify PASS) |
 |---|---|---|
 | D1 | Demo Proxmox VM provisioned | ✓ (VM 914, IP 10.32.161.183) |
-| D2 | Magento 2.4.7-p3 devbox running | ✓ markshust devbox; admin `https://magento.test/admin` (creds `john.smith` / `password123`); 7 healthy containers (`app`, `phpfpm`, `db` mariadb:10.6, `opensearch`, `redis`, `rabbitmq`, `mailcatcher`) |
-| D3 | OST engine running | ✓ Re-using shared engine at `http://10.32.161.126:8080` (v0.58.0 verified `database_connected:true` from inside the Magento container) |
-| D4 | Module installed via Composer path repo | ✓ symlinked from `/opensalestax-magento` inside `magento-phpfpm-1`; v1.3.1 working tree |
-| D5 | Module enabled and configured via admin | Pending v1.3.1 re-deploy on VM (v1.3.0 was configured via direct DB insert as Bug A workaround; v1.3.1 fixes the underlying ctor + admin save) |
-| D6 | Real $100 MN checkout returns plausible tax | Engine math verified ($100/55403 → $9.025; $110 cart with $10 shipping → $9.9275). End-to-end Magento checkout pending v1.3.1 re-deploy on VM 914 |
+| D2 | Magento 2.4.7-p3 devbox running | ✓ markshust devbox; admin `https://magento.test/admin` (creds `john.smith` / `password123`); 7 healthy containers |
+| D3 | OST engine running | ✓ Re-using shared engine at `http://10.32.161.126:8080` (v0.58.0) |
+| D4 | Module installed via Composer path repo | ✓ v1.3.5 in container at `/opensalestax-magento`; DI compiled clean |
+| D5 | Module enabled and configured via admin | ✓ `bin/magento config:set` works (Bug A fix); core_config_data has clean rows from CLI writes |
+| D6 | Real MN Quote returns plausible tax | ✓ **`$ship->getTaxAmount() = $9.4763`** on $100 product + $5 shipping to MN/55403. 6 jurisdictions in `getAppliedTaxes`. Grand total balances exactly ($100 + $5 + $9.4763 = $114.4763). Engine call logged. Reproducible across two back-to-back runs. **Six-bug chain closed; all D2-D6 ✓.** |
 
 ## Bug history surfaced by the live bootstrap
 
