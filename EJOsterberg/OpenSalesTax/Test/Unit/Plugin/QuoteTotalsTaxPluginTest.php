@@ -188,15 +188,21 @@ final class QuoteTotalsTaxPluginTest extends TestCase
         $plugin->beforeCollect(new stdClass(), $shippingAssignment->getShipping()->getAddress()->getQuote(), $shippingAssignment, $this->buildTotal());
     }
 
-    public function testAfterCollectWritesAppliedTaxesFromRegistry(): void
+    public function testAfterCollectWritesAppliedTaxesAndTaxAmountFromRegistry(): void
     {
+        // Bug F (v1.3.5): in addition to `setAppliedTaxes` (the per-
+        // jurisdiction *breakdown*), the plugin MUST call setTaxAmount,
+        // setBaseTaxAmount, setTotalAmount('tax', X), setBaseTotalAmount-
+        // ('tax', X). Magento reads $address->getTaxAmount() and the
+        // grand-total roll-up from those — NOT from applied_taxes.
         $registry = new QuoteTaxRegistry();
         $registry->set(10, 'US', OstaxResponse::fromArray([
+            'tax_total' => 7.025,
             'lines' => [
                 [
                     'line_id' => '1',
-                    'tax'     => 8.0,
-                    'rate'    => 0.08,
+                    'tax'     => 7.025,
+                    'rate'    => 0.07025,
                     'jurisdictions' => [
                         ['name' => 'Minnesota State', 'rate' => 0.06875, 'tax' => 6.875],
                         ['name' => 'Hennepin County', 'rate' => 0.0015,  'tax' => 0.15],
@@ -216,22 +222,116 @@ final class QuoteTotalsTaxPluginTest extends TestCase
         $total = new class () {
             /** @var array<int, array<string, mixed>>|null */
             public ?array $appliedTaxes = null;
+            public ?float $taxAmount = null;
+            public ?float $baseTaxAmount = null;
+            /** @var array<string, float> */
+            public array $totalAmounts = [];
+            /** @var array<string, float> */
+            public array $baseTotalAmounts = [];
 
-            /**
-             * @param array<int, array<string, mixed>> $taxes
-             */
+            /** @param array<int, array<string, mixed>> $taxes */
             public function setAppliedTaxes(array $taxes): void
             {
                 $this->appliedTaxes = $taxes;
+            }
+            public function setTaxAmount(float $amount): void
+            {
+                $this->taxAmount = $amount;
+            }
+            public function setBaseTaxAmount(float $amount): void
+            {
+                $this->baseTaxAmount = $amount;
+            }
+            public function setTotalAmount(string $code, float $amount): void
+            {
+                $this->totalAmounts[$code] = $amount;
+            }
+            public function setBaseTotalAmount(string $code, float $amount): void
+            {
+                $this->baseTotalAmounts[$code] = $amount;
             }
         };
 
         $plugin->afterCollect(new stdClass(), new stdClass(), $shippingAssignment->getShipping()->getAddress()->getQuote(), $shippingAssignment, $total);
 
+        // Breakdown (already covered pre-v1.3.5)
         self::assertNotNull($total->appliedTaxes);
         self::assertCount(2, $total->appliedTaxes);
         self::assertSame('Minnesota State', $total->appliedTaxes[0]['id']);
         self::assertEqualsWithDelta(6.875, $total->appliedTaxes[0]['amount'], 0.0001);
+
+        // The actual tax-amount writes (the Bug F #2 fix)
+        self::assertEqualsWithDelta(7.025, $total->taxAmount ?? -1.0, 0.0001, 'setTaxAmount must be called (Bug F)');
+        self::assertEqualsWithDelta(7.025, $total->baseTaxAmount ?? -1.0, 0.0001, 'setBaseTaxAmount must be called (Bug F)');
+        self::assertArrayHasKey('tax', $total->totalAmounts, 'setTotalAmount(tax, X) must be called (Bug F)');
+        self::assertEqualsWithDelta(7.025, $total->totalAmounts['tax'], 0.0001);
+        self::assertArrayHasKey('tax', $total->baseTotalAmounts, 'setBaseTotalAmount(tax, X) must be called (Bug F)');
+        self::assertEqualsWithDelta(7.025, $total->baseTotalAmounts['tax'], 0.0001);
+    }
+
+    /**
+     * Bug F regression part 2: when the $total argument exposes its
+     * setters ONLY via __call (mirroring how Magento's
+     * `Quote\Address\Total` DataObject routes setTaxAmount/etc), the
+     * v1.3.4 `method_exists()` guard skipped the call entirely. The
+     * `is_callable()` check (which consults __call) must accept these.
+     */
+    public function testAfterCollectWritesTaxAmountThroughMagicCallSetters(): void
+    {
+        $registry = new QuoteTaxRegistry();
+        $registry->set(20, 'US', OstaxResponse::fromArray([
+            'tax_total' => 9.025,
+            'lines' => [
+                [
+                    'line_id' => '1',
+                    'tax'     => 9.025,
+                    'rate'    => 0.09025,
+                    'jurisdictions' => [
+                        ['name' => 'Minnesota State', 'rate' => 0.06875, 'tax' => 6.875],
+                    ],
+                ],
+            ],
+        ]));
+
+        $plugin = new QuoteTotalsTaxPlugin(
+            $this->createMock(Config::class),
+            $this->createMock(OstaxClient::class),
+            $registry,
+            $this->createMock(LoggerInterface::class)
+        );
+
+        // Quote that routes getId via __call (like Magento's Interceptor).
+        $quote = new class () {
+            public function __call(string $name, array $args): mixed
+            {
+                return match ($name) { 'getId' => 20, default => null };
+            }
+        };
+
+        $shippingAssignment = $this->buildShippingAssignment(quoteId: 20, currency: 'USD', country: 'US', items: []);
+
+        // $total exposes its setters ONLY via __call (like
+        // Magento\Quote\Model\Quote\Address\Total — a DataObject).
+        $total = new class () {
+            /** @var array<string, mixed> */
+            public array $captured = [];
+            public function __call(string $name, array $args): mixed
+            {
+                $this->captured[$name] = $args;
+                return $this;
+            }
+        };
+
+        $plugin->afterCollect(new stdClass(), new stdClass(), $quote, $shippingAssignment, $total);
+
+        self::assertArrayHasKey('setTaxAmount', $total->captured, 'Bug F: setTaxAmount must be called even when only __call exposes it');
+        self::assertEqualsWithDelta(9.025, $total->captured['setTaxAmount'][0], 0.0001);
+        self::assertArrayHasKey('setBaseTaxAmount', $total->captured);
+        self::assertArrayHasKey('setTotalAmount', $total->captured);
+        self::assertSame('tax', $total->captured['setTotalAmount'][0]);
+        self::assertEqualsWithDelta(9.025, $total->captured['setTotalAmount'][1], 0.0001);
+        self::assertArrayHasKey('setBaseTotalAmount', $total->captured);
+        self::assertArrayHasKey('setAppliedTaxes', $total->captured);
     }
 
     /**

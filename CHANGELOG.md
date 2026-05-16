@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.5] - 2026-05-15
+
+### Fixed
+
+- **Bug F #1 — `method_exists()` vs `__call` in `afterCollect()`.** v1.3.4 fixed the four magic-getter sites in `beforeCollect()` but missed `afterCollect()`'s two: `method_exists($quote, 'getId')` at line 164 and `method_exists($total, 'setAppliedTaxes')` at line 195. Same root cause as Bug E (DataObject getters/setters route via `__call`, `method_exists()` returns false). Swap to `is_callable([$x, 'methodName'])` which consults `__call`.
+- **Bug F #2 — `afterCollect()` never wrote the actual tax amount.** Latent since v0.1.0 but only surfaced now because Bugs C/D/E all stopped execution before reaching `afterCollect()`. The plugin called `$total->setAppliedTaxes(...)` — the per-jurisdiction *breakdown* — but never `setTaxAmount()` / `setBaseTaxAmount()` / `setTotalAmount('tax', X)` / `setBaseTotalAmount('tax', X)`. Magento's grand-total roll-up + `Address::getTaxAmount()` both read from those setters, NOT from `applied_taxes`. So even when v1.3.4 finally reached the engine and got a correct tax response, the cart still showed `tax_amount: 0` because the response value was never written to the canonical Magento totals fields. Added the canonical write sequence per `vendor/magento/module-tax/Model/Sales/Total/Quote/Tax::collect()`. USD-only by constitution §5 → base values == current values.
+
+### Tests
+
+- Updated `testAfterCollectWritesAppliedTaxesAndTaxAmountFromRegistry` (was `…WritesAppliedTaxesFromRegistry`) to assert the new `setTaxAmount` / `setBaseTaxAmount` / `setTotalAmount('tax', …)` / `setBaseTotalAmount('tax', …)` calls fire — pins both halves of Bug F.
+- New `testAfterCollectWritesTaxAmountThroughMagicCallSetters` covers the exact Magento-Interceptor case where the `$total` object exposes its setters only via `__call`. The pre-v1.3.5 `method_exists()` guards would skip those entirely. Verified to fail on the v1.3.4 sig.
+- 76 unit tests / 179 assertions total (was 75 / 165).
+
+### Compatibility
+
+No public API changes. Strict improvement over v1.3.4 — Bug F kept the cart at `tax_amount: 0` even after the five prior bug fixes landed the engine call. v1.3.5 is the first release where the engine response actually drives Magento's cart totals.
+
+### The six-bug post-mortem (still the same systemic story)
+
+| Bug | Latent since | Fixed in | Surface |
+|---|---|---|---|
+| A — backend-model ctors broke Interceptors | v1.1.0 | v1.3.1 | live `setup:di:compile` |
+| B — payload + response shape drifted | engine drift | v1.3.1 | real engine v0.58 |
+| C — di.xml target class wrong | v0.1.0 | v1.3.2 | real `collectTotals()` |
+| D — plugin method arity wrong | v0.1.0 | v1.3.3 | plugin actually firing |
+| E — method_exists vs __call on Interceptor (beforeCollect) | v1.3.1 | v1.3.4 | real Magento Interceptor magic getters |
+| **F — method_exists vs __call in afterCollect + missing setTaxAmount writes** | v1.3.1 / **v0.1.0** | **v1.3.5** | `afterCollect` actually firing AND tax-amount writes asserted by Magento's grand-total roll-up |
+
+Bug F is two bugs in one fix: F#1 is the same as Bug E in the parallel method; F#2 is the v0.1.0-era omission of `setTaxAmount()` that nothing prior had ever exercised. Each bug exposed the next one underneath. **The persistent lesson:** unit-test CI cannot reach Magento Interceptor + canonical-totals-write behavior; a live-Magento integration test that asserts `$address->getTaxAmount() > 0` would have caught E + F#2 in one shot.
+
 ## [1.3.4] - 2026-05-15
 
 ### Fixed

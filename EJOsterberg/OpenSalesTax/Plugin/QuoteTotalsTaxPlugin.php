@@ -161,7 +161,10 @@ class QuoteTotalsTaxPlugin
         object $shippingAssignment,
         object $total
     ): object {
-        if (!method_exists($quote, 'getId')) {
+        // Bug F (v1.3.5): same method_exists vs __call trap as Bug E.
+        // `getId` on a real Magento Quote\Interceptor routes via __call;
+        // `is_callable` consults __call and returns true.
+        if (!is_callable([$quote, 'getId'])) {
             $quote = $this->extractQuote($shippingAssignment);
             if ($quote === null) {
                 return $result;
@@ -175,6 +178,7 @@ class QuoteTotalsTaxPlugin
         }
 
         $appliedTaxes = [];
+        $taxTotal = (float)$response->taxTotal;
         foreach ($response->lineTaxes as $line) {
             foreach ($line['jurisdictions'] as $jurisdiction) {
                 $name = $jurisdiction['name'];
@@ -192,7 +196,29 @@ class QuoteTotalsTaxPlugin
             }
         }
 
-        if ($appliedTaxes !== [] && method_exists($total, 'setAppliedTaxes')) {
+        // Bug F #2 (v1.3.5): the canonical Magento totals-write pattern.
+        // `setAppliedTaxes` alone is just the per-jurisdiction *receipt*
+        // breakdown; Magento's grand_total roll-up and `Address::getTaxAmount`
+        // read from `$total->getTaxAmount()` + `$total->getTotalAmount('tax')`,
+        // not from applied_taxes. Without these writes the cart shows a
+        // breakdown but a $0 tax total. Reference: vendor/magento/module-tax/
+        // Model/Sales/Total/Quote/Tax::collect() shows the canonical writes.
+        //
+        // USD-only by constitution §5 → base currency == quote currency,
+        // so base_* values are identical to current-* values.
+        if (is_callable([$total, 'setTaxAmount'])) {
+            $total->setTaxAmount($taxTotal);
+        }
+        if (is_callable([$total, 'setBaseTaxAmount'])) {
+            $total->setBaseTaxAmount($taxTotal);
+        }
+        if (is_callable([$total, 'setTotalAmount'])) {
+            $total->setTotalAmount('tax', $taxTotal);
+        }
+        if (is_callable([$total, 'setBaseTotalAmount'])) {
+            $total->setBaseTotalAmount('tax', $taxTotal);
+        }
+        if ($appliedTaxes !== [] && is_callable([$total, 'setAppliedTaxes'])) {
             $total->setAppliedTaxes(array_values($appliedTaxes));
         }
 
