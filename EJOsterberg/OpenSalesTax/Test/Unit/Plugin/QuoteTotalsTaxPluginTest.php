@@ -235,6 +235,110 @@ final class QuoteTotalsTaxPluginTest extends TestCase
     }
 
     /**
+     * Bug E regression: Magento Interceptor wraps domain objects and routes
+     * `getQuoteCurrencyCode` / `getRowTotal` / `getTaxClassId` /
+     * `getShippingAmount` through `__call` → `getData`. Those aren't
+     * declared methods on the Interceptor class, so `method_exists()`
+     * returns false even though `is_callable()` (which consults `__call`)
+     * returns true. The pre-v1.3.4 plugin used `method_exists()` and so
+     * silently bailed out before the engine call on every real Magento
+     * checkout. This test pins the post-v1.3.4 `is_callable()` behavior
+     * by passing objects that only expose getters through `__call` —
+     * no declared methods.
+     */
+    public function testBeforeCollectHandlesMagicGettersOnMagentoInterceptorObjects(): void
+    {
+        $config = $this->createMock(Config::class);
+        $config->method('isConfigured')->willReturn(true);
+        $config->method('isFailHard')->willReturn(false);
+
+        $capturedPayload = null;
+        $client = $this->createMock(OstaxClient::class);
+        $client->expects(self::once())
+            ->method('calculate')
+            ->willReturnCallback(function (array $payload) use (&$capturedPayload) {
+                $capturedPayload = $payload;
+                return OstaxResponse::fromArray([
+                    'tax_total' => 9.025,
+                    'lines'     => [['line_id' => '1', 'tax' => 9.025, 'rate' => 0.09025]],
+                ]);
+            });
+
+        // Quote with currency exposed ONLY via __call (mirrors Magento\Quote\Model\Quote\Interceptor)
+        $quote = new class () {
+            public function getId(): int { return 11; }
+            public function __call(string $name, array $args): mixed
+            {
+                return match ($name) {
+                    'getQuoteCurrencyCode' => 'USD',
+                    default => null,
+                };
+            }
+        };
+
+        // Item with row_total + tax_class_id exposed ONLY via __call
+        $item = new class () {
+            public function getId(): string { return 'magic-1'; }
+            public function __call(string $name, array $args): mixed
+            {
+                return match ($name) {
+                    'getRowTotal' => 100.0,
+                    'getTaxClassId' => 2,
+                    default => null,
+                };
+            }
+        };
+
+        $address = new class ($quote) {
+            public function __construct(private object $quote) {}
+            public function getCountryId(): string { return 'US'; }
+            public function getRegionCode(): string { return 'MN'; }
+            public function getPostcode(): string { return '55403'; }
+            public function getCity(): string { return 'Minneapolis'; }
+            public function getQuote(): object { return $this->quote; }
+        };
+
+        $shipping = new class ($address) {
+            public function __construct(private object $address) {}
+            public function getAddress(): object { return $this->address; }
+        };
+
+        $shippingAssignment = new class ($shipping, [$item]) {
+            /** @param array<int, object> $items */
+            public function __construct(private object $shipping, private array $items) {}
+            public function getShipping(): object { return $this->shipping; }
+            /** @return array<int, object> */
+            public function getItems(): array { return $this->items; }
+        };
+
+        // Total with shipping_amount exposed ONLY via __call
+        $total = new class () {
+            public function __call(string $name, array $args): mixed
+            {
+                return match ($name) {
+                    'getShippingAmount' => 10.0,
+                    default => null,
+                };
+            }
+        };
+
+        $registry = new QuoteTaxRegistry();
+        $plugin = new QuoteTotalsTaxPlugin($config, $client, $registry, $this->createMock(LoggerInterface::class));
+
+        $plugin->beforeCollect(new stdClass(), $quote, $shippingAssignment, $total);
+
+        // Must reach the engine — registry populated.
+        self::assertTrue($registry->has(11), 'Bug E: plugin bailed out before the engine call (method_exists() vs __call mismatch).');
+        self::assertIsArray($capturedPayload);
+        self::assertSame('55403', $capturedPayload['address']['zip5']);
+        // Two line_items: product + synthesized shipping line (from getShippingAmount via __call)
+        self::assertCount(2, $capturedPayload['line_items']);
+        self::assertSame('100.00', $capturedPayload['line_items'][0]['amount']);
+        self::assertSame('10.00', $capturedPayload['line_items'][1]['amount']);
+        self::assertSame('shipping', $capturedPayload['line_items'][1]['category']);
+    }
+
+    /**
      * @param array<int, array{id: string, row_total: float, qty: float}> $items
      */
     private function buildShippingAssignment(int $quoteId, string $currency, string $country, array $items): object

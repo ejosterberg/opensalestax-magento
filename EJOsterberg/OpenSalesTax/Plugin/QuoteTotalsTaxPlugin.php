@@ -95,7 +95,11 @@ class QuoteTotalsTaxPlugin
             }
         }
 
-        $currency = (string)(method_exists($quote, 'getQuoteCurrencyCode') ? $quote->getQuoteCurrencyCode() : '');
+        // Bug E (v1.3.4 fix): `method_exists()` returns FALSE on Magento
+        // Interceptor objects for magic getters (routed via __call/getData).
+        // `is_callable()` consults __call and returns true for the
+        // compiled-from-getData-key getters. Verified 2026-05-15 on VM 914.
+        $currency = (string)(is_callable([$quote, 'getQuoteCurrencyCode']) ? $quote->getQuoteCurrencyCode() : '');
         if ($currency !== self::CURRENCY_USD) {
             return $passthrough;
         }
@@ -234,7 +238,11 @@ class QuoteTotalsTaxPlugin
             if ($lineId === '') {
                 continue;
             }
-            $amount = (float)(method_exists($item, 'getRowTotal') ? $item->getRowTotal() : 0.0);
+            // Bug E: see comment at the currency check above. `getRowTotal`,
+            // `getTaxClassId`, `getShippingAmount` are all Magento magic
+            // getters dispatched via `__call` → `method_exists()` returns
+            // false on Interceptor; `is_callable()` returns true.
+            $amount = (float)(is_callable([$item, 'getRowTotal']) ? $item->getRowTotal() : 0.0);
             if ($amount <= 0.0) {
                 continue;
             }
@@ -243,12 +251,12 @@ class QuoteTotalsTaxPlugin
             // item's getTaxClassId(); fall back to the underlying product if the
             // item is wrapping one. Unknown / zero / unmapped → DEFAULT_CATEGORY.
             $taxClassId = 0;
-            if (method_exists($item, 'getTaxClassId')) {
+            if (is_callable([$item, 'getTaxClassId'])) {
                 $taxClassId = (int)$item->getTaxClassId();
             }
             if ($taxClassId === 0 && method_exists($item, 'getProduct')) {
                 $product = $item->getProduct();
-                if (is_object($product) && method_exists($product, 'getTaxClassId')) {
+                if (is_object($product) && is_callable([$product, 'getTaxClassId'])) {
                     $taxClassId = (int)$product->getTaxClassId();
                 }
             }
@@ -260,7 +268,7 @@ class QuoteTotalsTaxPlugin
             ];
         }
 
-        $shippingAmount = (float)(method_exists($total, 'getShippingAmount') ? $total->getShippingAmount() : 0.0);
+        $shippingAmount = (float)(is_callable([$total, 'getShippingAmount']) ? $total->getShippingAmount() : 0.0);
         if ($shippingAmount > 0.0) {
             $lineItems[] = [
                 'amount'   => number_format($shippingAmount, 2, '.', ''),

@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.4] - 2026-05-15
+
+### Fixed
+
+- **Bug E — `method_exists()` returns FALSE on Magento Interceptor magic getters.** When Magento compiles a `…\Interceptor` subclass over `Quote`/`Item`/`Total`, the magic getters routed via `__call` → `getData` are *not* declared methods on the Interceptor class. `method_exists($quote, 'getQuoteCurrencyCode')` returns false even though `$quote->getQuoteCurrencyCode()` returns `'USD'` at runtime. The plugin's defensive ternary at line 98 (added in v1.3.1's Bug-A fix) then fell through to `''`, failed the `!== self::CURRENCY_USD` check, and returned early — every real Magento checkout silently bailed before the engine call. Same problem at three more sites: `getRowTotal` + `getTaxClassId` on Item, `getShippingAmount` on Total. Five `method_exists()` calls now use `is_callable([$x, 'getFoo'])`, which DOES consult `__call` and returns true for the magic-getter path. Latent since v1.3.1's defensive-coding pattern was introduced (~3 hours ago in the v1.3.0 → v1.3.4 chain), but masked by Bug D which always crashed before reaching these lines.
+
+### Added
+
+- **`testBeforeCollectHandlesMagicGettersOnMagentoInterceptorObjects`** — regression test using anonymous classes that expose getters *only* through `__call` (mirrors how Magento Interceptors expose `getData`-key getters). Verified to fail on the v1.3.3 `method_exists()` sig with the explicit message "Bug E: plugin bailed out before the engine call". 75 unit tests / 165 assertions total (was 74 / 157).
+
+### Compatibility
+
+No public API changes. Anyone on v1.3.0–v1.3.3 hit silent $0 tax on real Magento Quotes; v1.3.4 is the first release where the plugin actually engages the engine on a real checkout. The `method_exists()` calls on truly-declared methods (`getId`, `getProduct`, `setAppliedTaxes`, `getShipping`, `getAddress`, `getQuote`, `getItems`) are left as-is — those don't go through `__call`.
+
+### The five-bug post-mortem (now final final)
+
+| Bug | Latent since | Fixed in | Surface |
+|---|---|---|---|
+| A — backend-model ctors broke Interceptors | v1.1.0 | v1.3.1 | live `setup:di:compile` |
+| B — payload + response shape drifted | (engine drift) | v1.3.1 | real engine v0.58 |
+| C — di.xml target class wrong | v0.1.0 | v1.3.2 | real `collectTotals()` |
+| D — plugin method arity wrong | v0.1.0 | v1.3.3 | plugin actually firing |
+| E — method_exists vs __call on Interceptor | v1.3.1 | **v1.3.4** | real Magento Interceptor magic getters |
+
+Bugs A and B were classic engineering bugs caught on the first live deploy. Bugs C and D were latent since v0.1.0, masked by the cumulative absence of any live deploy. Bug E was *introduced* by v1.3.1's defensive coding for Bug A — `method_exists()` works fine against unit-test mocks (which declare their getters) but fails against real Magento Interceptor objects. The defensive ternary saved us from the original v1.0 crash but planted Bug E along the way.
+
+**Final lesson — this is now in `portfolio/log.md`:** the unit-test surface area structurally cannot reach Magento Interceptor behavior. Future Magento-tier work needs a live-Magento integration test (likely `@magento/testing` harness, or a CI-driven docker-compose markshust spin-up + smoke test) at PR time. The three new regression tests added during this run (`DiXmlTargetClassTest`, `PluginAritySignatureTest`, the magic-getter test) catch the specific classes of bug we hit, but they're patches over the deeper gap.
+
 ## [1.3.3] - 2026-05-15
 
 ### Fixed
