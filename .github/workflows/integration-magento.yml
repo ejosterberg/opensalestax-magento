@@ -53,8 +53,14 @@ jobs:
         # reasonable. Expand to 2.4.5 / 2.4.6 in v1.4.x once the baseline
         # is reliably green - see CHANGELOG entry for v1.3.6.
         include:
+          # NOTE: Magento 2.4.7-p3 ships a DI bug in
+          # InventoryDistanceBasedSourceSelectionApi (GetLatsLngsFromAddressInterface
+          # has no DI-mapped implementation in the integration-test app
+          # area, breaking any quote save). 2.4.6-p10 doesn't have it.
+          # When v1.4.x widens the matrix, add 2.4.7 back via the
+          # explicit virtual-product fixture workaround.
           - php: "8.2"
-            magento: "2.4.7-p3"
+            magento: "2.4.6-p10"
 
     services:
       # Magento setup:install needs MySQL 8 (2.4.7-p3) + OpenSearch 2.x
@@ -232,17 +238,6 @@ jobs:
           # Drop every line that contains an 'amqp-' config key. The
           # remaining commas in the array literal are still valid PHP.
           sed -i "/'amqp-/d" etc/install-config-mysql.php
-          # Disable InventoryDistanceBasedSourceSelection (Magento OSS
-          # 2.4.7-p3 ships a DI bug where GetGeoCodesForAddress declares
-          # ClientInterface but is wired with Curl - DI fails any time
-          # the multi-source-inventory checker runs against a quote
-          # item with a stock_id set). This module isn't on the path
-          # we exercise (single-source default stock), so disabling it
-          # is loss-less for the test's coverage of the OST plugin.
-          sed -i "s|'disable-modules' => .*|'disable-modules' => 'Magento_InventoryDistanceBasedSourceSelection,Magento_InventoryDistanceBasedSourceSelectionAdminUi,Magento_InventoryDistanceBasedSourceSelectionApi',|" etc/install-config-mysql.php
-          # If the .dist didn't have a disable-modules key at all, inject one before the closing bracket.
-          grep -q "'disable-modules'" etc/install-config-mysql.php \
-            || sed -i "s|^];|    'disable-modules' => 'Magento_InventoryDistanceBasedSourceSelection,Magento_InventoryDistanceBasedSourceSelectionAdminUi,Magento_InventoryDistanceBasedSourceSelectionApi',\n];|" etc/install-config-mysql.php
           echo "=== effective install-config-mysql.php ==="
           cat etc/install-config-mysql.php
 

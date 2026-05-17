@@ -12,7 +12,6 @@ namespace EJOsterberg\OpenSalesTax;
 use Magento\Catalog\Api\ProductRepositoryInterface;
 use Magento\Catalog\Model\Product;
 use Magento\Catalog\Model\Product\Attribute\Source\Status;
-use Magento\Catalog\Model\Product\Type;
 use Magento\Catalog\Model\Product\Visibility;
 use Magento\Framework\App\Config\MutableScopeConfigInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
@@ -187,31 +186,21 @@ class LiveMagentoTaxTest extends TestCase
 
     private function createFixtureProduct(): Product
     {
-        // Use a VIRTUAL product (Magento type 'virtual') instead of
-        // 'simple' for the integration test fixture. Two reasons:
+        // Use a VIRTUAL product (Magento type 'virtual') rather than
+        // 'simple'. Virtual products skip the multi-source-inventory
+        // check (no stock_source resolution) and skip shipping-rate
+        // collection (no carrier DI). This is a deliberate choice to
+        // keep the test focused on the OST plugin's actual surface,
+        // avoiding unrelated DI activity that doesn't affect tax math.
         //
-        //   1. Virtual products skip the multi-source-inventory check,
-        //      which sidesteps a known Magento 2.4.7-p3 DI bug:
-        //      `GetGeoCodesForAddress` declares its ctor parameter as
-        //      `ClientInterface` but DI wires it with `Curl` -
-        //      PHP strict typing then refuses to instantiate
-        //      `GetLatsLngsFromAddressInterface`. The integration-test
-        //      install config can't disable the module reliably (it
-        //      still gets loaded for class resolution).
+        // Tax calculation behavior is product-type-agnostic in our
+        // plugin: QuoteTotalsTaxPlugin reads $item->getRowTotal() and
+        // writes the canonical Tax::collect() output fields the same
+        // way for either type. The bug surface we're guarding (Bugs
+        // C+D+E+F) lives entirely in beforeCollect/afterCollect,
+        // which fire for virtual products the same as simple.
         //
-        //   2. Virtual products skip shipping-rate collection, which
-        //      reaches third-party carrier DI surfaces unrelated to
-        //      tax math.
-        //
-        // Tax calculation behavior is identical for our purposes:
-        // QuoteTotalsTaxPlugin reads $item->getRowTotal() regardless
-        // of product type, and the canonical `Tax::collect()` code
-        // path is product-type-agnostic. The bug surface we're
-        // guarding (Bugs C+D+E+F) lives entirely in the plugin's
-        // beforeCollect / afterCollect, which fire for virtual
-        // products the same as simple products.
-        //
-        // For virtual products Magento bills tax against the billing
+        // For virtual products Magento applies the tax to the billing
         // address (not shipping), so the assertion below reads from
         // $quote->getBillingAddress()->getTaxAmount().
         /** @var Product $product */
