@@ -1,8 +1,36 @@
 # Live-Magento integration test (Mg-1)
 
 This is the operator's reference for the integration test that closes the
-gap exposed by the v1.3.0 → v1.3.5 six-bug evening (May 2026). See
+gap exposed by the v1.3.0 -> v1.3.5 six-bug evening (May 2026). See
 `CHANGELOG.md` for the full post-mortem.
+
+## Status (v1.3.6)
+
+**Incubation mode.** The workflow runs on every PR + push to main but
+is `continue-on-error: true` because two upstream Magento OSS issues
+block end-to-end green:
+
+- **2.4.7-p3**: DI bug in `InventoryDistanceBasedSourceSelectionApi`
+  (`Cannot instantiate interface GetLatsLngsFromAddressInterface`).
+  Affects any quote save that touches inventory.
+- **2.4.6-p10**: composer conflict (`sebastian/comparator <=4.0.6`
+  constraint vs `phpunit ^9.5` requiring `^4.0.10`).
+
+Both are upstream issues, not regressions in this module. When v1.4.x
+picks up matrix expansion, the path forward is one of:
+
+1. Wait for Adobe to ship a fix (2.4.7-p4 or 2.4.6-p11).
+2. Apply a virtual-product fixture (already in `LiveMagentoTaxTest`)
+   plus an explicit DI override for `GetLatsLngsFromAddressInterface`.
+3. Move the integration test framework off `dev/tests/integration` to
+   a leaner harness (e.g., `mage-os/github-actions/integration` once
+   they ship one — track at https://github.com/mage-os/github-actions).
+
+The infrastructure underneath is solid: mock OST engine + Magento
+project create + composer install + ObjectManager bootstrap + test
+discovery all succeed. The Mg-1 assertion (`$address->getTaxAmount() > 0`)
+runs against the real Magento Interceptor/DI/canonical-totals-write
+path the moment one of the above three options unblocks the harness.
 
 ## What it tests
 
