@@ -1,5 +1,5 @@
 <?php
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 declare(strict_types=1);
 
 namespace EJOsterberg\OpenSalesTax\Test\Unit\Plugin;
@@ -194,7 +194,7 @@ final class QuoteTotalsTaxPluginTest extends TestCase
         // jurisdiction *breakdown*), the plugin MUST call setTaxAmount,
         // setBaseTaxAmount, setTotalAmount('tax', X), setBaseTotalAmount-
         // ('tax', X). Magento reads $address->getTaxAmount() and the
-        // grand-total roll-up from those — NOT from applied_taxes.
+        // grand-total roll-up from those â€” NOT from applied_taxes.
         $registry = new QuoteTaxRegistry();
         $registry->set(10, 'US', OstaxResponse::fromArray([
             'tax_total' => 7.025,
@@ -311,7 +311,7 @@ final class QuoteTotalsTaxPluginTest extends TestCase
         $shippingAssignment = $this->buildShippingAssignment(quoteId: 20, currency: 'USD', country: 'US', items: []);
 
         // $total exposes its setters ONLY via __call (like
-        // Magento\Quote\Model\Quote\Address\Total — a DataObject).
+        // Magento\Quote\Model\Quote\Address\Total â€” a DataObject).
         $total = new class () {
             /** @var array<string, mixed> */
             public array $captured = [];
@@ -337,13 +337,13 @@ final class QuoteTotalsTaxPluginTest extends TestCase
     /**
      * Bug E regression: Magento Interceptor wraps domain objects and routes
      * `getQuoteCurrencyCode` / `getRowTotal` / `getTaxClassId` /
-     * `getShippingAmount` through `__call` → `getData`. Those aren't
+     * `getShippingAmount` through `__call` â†’ `getData`. Those aren't
      * declared methods on the Interceptor class, so `method_exists()`
      * returns false even though `is_callable()` (which consults `__call`)
      * returns true. The pre-v1.3.4 plugin used `method_exists()` and so
      * silently bailed out before the engine call on every real Magento
      * checkout. This test pins the post-v1.3.4 `is_callable()` behavior
-     * by passing objects that only expose getters through `__call` —
+     * by passing objects that only expose getters through `__call` â€”
      * no declared methods.
      */
     public function testBeforeCollectHandlesMagicGettersOnMagentoInterceptorObjects(): void
@@ -427,7 +427,7 @@ final class QuoteTotalsTaxPluginTest extends TestCase
 
         $plugin->beforeCollect(new stdClass(), $quote, $shippingAssignment, $total);
 
-        // Must reach the engine — registry populated.
+        // Must reach the engine â€” registry populated.
         self::assertTrue($registry->has(11), 'Bug E: plugin bailed out before the engine call (method_exists() vs __call mismatch).');
         self::assertIsArray($capturedPayload);
         self::assertSame('55403', $capturedPayload['address']['zip5']);

@@ -1,5 +1,5 @@
 <?php
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 declare(strict_types=1);
 
 namespace EJOsterberg\OpenSalesTax\Model;
@@ -21,12 +21,12 @@ use Psr\Log\LoggerInterface;
  * Authentication: if a token is configured, we send it as a Bearer header.
  * TLS verification is left at Curl defaults (peer-verify on).
  *
- * Failure model (constitution §8): this class throws typed exceptions on any
+ * Failure model (constitution Â§8): this class throws typed exceptions on any
  * non-2xx response or malformed body. The caller decides whether to
  * fail-soft (catch + fall back to Magento's built-in calc) or fail-hard
  * (rethrow, block checkout).
  *
- * Logging: only structured metadata (no full payloads — they carry
+ * Logging: only structured metadata (no full payloads â€” they carry
  * customer addresses). The api_token is never logged.
  */
 class OstaxClient
@@ -138,7 +138,7 @@ class OstaxClient
      *
      * When the admin's `restrict_to_public_ips` toggle is on, the backend_model
      * pins the resolved IP at save time. Here we honor that pin via
-     * `CURLOPT_RESOLVE` so the runtime cURL connection bypasses DNS entirely —
+     * `CURLOPT_RESOLVE` so the runtime cURL connection bypasses DNS entirely â€”
      * defends against DNS rebinding (host resolves public at save time, then
      * to an internal IP at request time).
      */
@@ -157,7 +157,7 @@ class OstaxClient
     /**
      * Pass `CURLOPT_RESOLVE` when a pinned IP is configured, so cURL dials
      * that IP regardless of what DNS currently returns. No-op when the pin
-     * is unset (admin has `restrict_to_public_ips` off — normal DNS).
+     * is unset (admin has `restrict_to_public_ips` off â€” normal DNS).
      */
     private function applyPinnedIp(): void
     {

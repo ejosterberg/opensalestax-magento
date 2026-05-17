@@ -2,7 +2,7 @@
     "name": "ejosterberg/module-opensalestax",
     "description": "Magento 2 module — destination-based US sales tax via the self-hosted OpenSalesTax engine",
     "type": "magento2-module",
-    "license": "Apache-2.0",
+    "license": ["Apache-2.0", "GPL-2.0-or-later"],
     "keywords": ["magento", "magento2", "tax", "sales-tax", "us-tax", "opensalestax"],
     "homepage": "https://github.com/ejosterberg/opensalestax-magento",
     "authors": [

@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later -->
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
 
@@ -19,14 +19,14 @@
         Totals collector plugin: pre-warms the registry in beforeCollect,
         writes the per-jurisdiction breakdown in afterCollect.
 
-        IMPORTANT — the target class is the Tax module's totals collector
+        IMPORTANT â€” the target class is the Tax module's totals collector
         (Magento\Tax\Model\Sales\Total\Quote\Tax, registered in
         vendor/magento/module-tax/etc/sales.xml as
         <item name="tax" instance="..." sort_order="450">), NOT the
         Quote module's Magento\Quote\Model\Quote\Address\Total\Tax
         which doesn't exist. Magento's DI compiler silently no-ops
-        plugins on non-existent target classes — setup:di:compile
-        exits clean either way — so this bug was invisible at compile
+        plugins on non-existent target classes â€” setup:di:compile
+        exits clean either way â€” so this bug was invisible at compile
         time. Verified 2026-05-15 against Magento 2.4.7-p3 on VM 914
         (Bug C). Latent since v0.1.0 (b3c8894) until the live demo
         bootstrap surfaced it. Regression test:

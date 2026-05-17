@@ -1,5 +1,5 @@
 <?php
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 declare(strict_types=1);
 
 namespace EJOsterberg\OpenSalesTax\Model\Config\Backend;
@@ -20,14 +20,14 @@ use Magento\Framework\Registry;
  * Backend model for `osstax/general/api_url`.
  *
  * Three layers of defense:
- *  1. **beforeSave** — server-side scheme + parse validation (defeats JS-disabled
+ *  1. **beforeSave** â€” server-side scheme + parse validation (defeats JS-disabled
  *     bypass of the frontend `validate-url` class).
- *  2. **beforeSave (conditional)** — when `restrict_to_public_ips` is on, the
+ *  2. **beforeSave (conditional)** â€” when `restrict_to_public_ips` is on, the
  *     URL host must resolve to a non-private, non-reserved IP.
- *  3. **afterSave (conditional)** — when `restrict_to_public_ips` is on, the
+ *  3. **afterSave (conditional)** â€” when `restrict_to_public_ips` is on, the
  *     resolved IP is pinned to `osstax/general/api_url_pinned_ip` in the same
  *     scope. The OstaxClient reads that pin at request time and passes it to
- *     cURL via `CURLOPT_RESOLVE` so subsequent calls bypass DNS entirely —
+ *     cURL via `CURLOPT_RESOLVE` so subsequent calls bypass DNS entirely â€”
  *     defends against DNS rebinding.
  *
  * The pin is cleared (1) when the URL is saved empty and (2) when
@@ -47,7 +47,7 @@ class ApiUrl extends Value
      * Use Magento's explicit backend-model parent ctor signature. The
      * `...$parentArgs` variadic style breaks Magento's compiled
      * Interceptor subclasses, which forward parent ctor args BY POSITION
-     * — Position 1 must be `Context`, not our custom dep. (Verified
+     * â€” Position 1 must be `Context`, not our custom dep. (Verified
      * 2026-05-15 via live setup:di:compile on VM 914.)
      *
      * Custom OST deps (e.g. `WriterInterface`) go AFTER the Magento ones,
@@ -74,7 +74,7 @@ class ApiUrl extends Value
 
     /**
      * @throws LocalizedException When the URL is malformed, uses the wrong
-     *     scheme, or — with the restrict-to-public-IPs flag on — resolves to
+     *     scheme, or â€” with the restrict-to-public-IPs flag on â€” resolves to
      *     a private / reserved IP.
      */
     public function beforeSave(): self
@@ -96,7 +96,7 @@ class ApiUrl extends Value
     /**
      * Persists the pinned IP to a sibling config path when the restrict flag
      * was on and the URL resolved cleanly. Clears the pin otherwise so a flag
-     * flip from on → off does not leave a stale pin behind.
+     * flip from on â†’ off does not leave a stale pin behind.
      */
     public function afterSave(): self
     {

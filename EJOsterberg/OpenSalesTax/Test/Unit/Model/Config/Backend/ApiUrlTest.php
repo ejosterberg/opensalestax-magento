@@ -1,5 +1,5 @@
 <?php
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 declare(strict_types=1);
 
 namespace EJOsterberg\OpenSalesTax\Test\Unit\Model\Config\Backend;
@@ -28,7 +28,7 @@ final class ApiUrlTest extends TestCase
     /**
      * Build the model with the explicit Magento backend-model ctor signature
      * (the variadic-pass-through pattern used in v1.3.0 / v1.1.0 broke
-     * Magento's compiled Interceptors — see ApiUrl.php docblock).
+     * Magento's compiled Interceptors â€” see ApiUrl.php docblock).
      */
     private function makeModel(): ApiUrl
     {

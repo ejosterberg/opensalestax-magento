@@ -1,5 +1,5 @@
 <?php
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 declare(strict_types=1);
 
 namespace EJOsterberg\OpenSalesTax\Plugin;
@@ -23,15 +23,15 @@ use Psr\Log\LoggerInterface;
  *     "MN State Tax: $6.88, Hennepin County Tax: $1.50, ..." instead of
  *     a single opaque tax line.
  *
- * Gates (constitution §5):
+ * Gates (constitution Â§5):
  *  - Quote currency must be USD; otherwise return control to Magento.
  *  - Shipping country must be US; otherwise return control to Magento.
  *  - Module must be configured (api_url set); otherwise no-op.
  *
- * Failure model (constitution §8):
+ * Failure model (constitution Â§8):
  *  - Default fail-soft: any engine error is logged, registry stays empty,
  *    Magento's built-in tax_rate calc takes over.
- *  - `osstax/general/fail_hard=1` opts into rethrow → Magento surfaces a
+ *  - `osstax/general/fail_hard=1` opts into rethrow â†’ Magento surfaces a
  *    checkout exception, blocking the flow.
  */
 class QuoteTotalsTaxPlugin
@@ -52,11 +52,11 @@ class QuoteTotalsTaxPlugin
      * per line and our other plugin reads from the registry.
      *
      * Method signature MUST mirror the target's `collect()` arity exactly
-     * — Magento's compiled Interceptor uses the plugin-method signature to
+     * â€” Magento's compiled Interceptor uses the plugin-method signature to
      * decide what to forward to the parent. The target is
      * `Magento\Tax\Model\Sales\Total\Quote\Tax::collect(Quote, ShippingAssignment, Total)`
-     * → three args after `$subject`. (Bug D: the prior signature omitted
-     * `$quote` → parent called with 2 args → ArgumentCountError. Verified
+     * â†’ three args after `$subject`. (Bug D: the prior signature omitted
+     * `$quote` â†’ parent called with 2 args â†’ ArgumentCountError. Verified
      * 2026-05-15 on VM 914. Regression test:
      * `Test/Unit/Etc/PluginAritySignatureTest.php`.)
      *
@@ -143,7 +143,7 @@ class QuoteTotalsTaxPlugin
     /**
      * Surface per-jurisdiction breakdown onto the totals object.
      *
-     * Method signature MUST mirror `Tax::collect()` arity — same Bug D
+     * Method signature MUST mirror `Tax::collect()` arity â€” same Bug D
      * reasoning as `beforeCollect` above. Magento passes the return value
      * of the original method as `$result`, followed by the same args the
      * method received.
@@ -204,7 +204,7 @@ class QuoteTotalsTaxPlugin
         // breakdown but a $0 tax total. Reference: vendor/magento/module-tax/
         // Model/Sales/Total/Quote/Tax::collect() shows the canonical writes.
         //
-        // USD-only by constitution §5 → base currency == quote currency,
+        // USD-only by constitution Â§5 â†’ base currency == quote currency,
         // so base_* values are identical to current-* values.
         if (is_callable([$total, 'setTaxAmount'])) {
             $total->setTaxAmount($taxTotal);
@@ -237,16 +237,16 @@ class QuoteTotalsTaxPlugin
      * ```
      *
      * Notes:
-     *  - `amount` MUST be a decimal STRING (not float) — engine quantizes
+     *  - `amount` MUST be a decimal STRING (not float) â€” engine quantizes
      *    per-jurisdiction in fixed-point; floats lose precision.
      *  - Shipping is folded in as an extra line_item with `category=shipping`
-     *    when non-zero — engine handles per-state shipping-tax rules via
+     *    when non-zero â€” engine handles per-state shipping-tax rules via
      *    that category (matches the Saleor / Medusa connector pattern).
-     *  - `address.zip5` only — engine resolves the rest via ZIP. The ZIP is
+     *  - `address.zip5` only â€” engine resolves the rest via ZIP. The ZIP is
      *    extracted as the first 5 digits of the Magento postcode.
      *  - Lines without a usable id or a non-positive amount are skipped.
      *  - The 4 unused parameters `$quoteId`, `$shippingAddress.region/city/country`
-     *    that the v1.3.0 payload included are dropped — the engine ignores
+     *    that the v1.3.0 payload included are dropped â€” the engine ignores
      *    them anyway in v0.58.
      *
      * @param array<int, object> $items
@@ -266,7 +266,7 @@ class QuoteTotalsTaxPlugin
             }
             // Bug E: see comment at the currency check above. `getRowTotal`,
             // `getTaxClassId`, `getShippingAmount` are all Magento magic
-            // getters dispatched via `__call` → `method_exists()` returns
+            // getters dispatched via `__call` â†’ `method_exists()` returns
             // false on Interceptor; `is_callable()` returns true.
             $amount = (float)(is_callable([$item, 'getRowTotal']) ? $item->getRowTotal() : 0.0);
             if ($amount <= 0.0) {
@@ -275,7 +275,7 @@ class QuoteTotalsTaxPlugin
 
             // Resolve OST category from the line's Magento tax class. Try the
             // item's getTaxClassId(); fall back to the underlying product if the
-            // item is wrapping one. Unknown / zero / unmapped → DEFAULT_CATEGORY.
+            // item is wrapping one. Unknown / zero / unmapped â†’ DEFAULT_CATEGORY.
             $taxClassId = 0;
             if (is_callable([$item, 'getTaxClassId'])) {
                 $taxClassId = (int)$item->getTaxClassId();

@@ -1,5 +1,5 @@
 <?php
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 declare(strict_types=1);
 
 namespace EJOsterberg\OpenSalesTax\Model;
@@ -8,7 +8,7 @@ namespace EJOsterberg\OpenSalesTax\Model;
  * Request-scoped registry holding OST engine responses for the active quote(s).
  *
  * Magento's totals pipeline calls `Calculation::getRate(...)` many times per
- * checkout — once per (customer-tax-class × product-tax-class × destination)
+ * checkout â€” once per (customer-tax-class Ã— product-tax-class Ã— destination)
  * combination. We want to call the OST engine exactly once per quote, so the
  * totals-collector plugin pre-warms this registry in its `beforeCollect`
  * hook, and the `getRate` plugin reads from it.

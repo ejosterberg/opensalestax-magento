@@ -1,5 +1,5 @@
 <?php
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 declare(strict_types=1);
 
 namespace EJOsterberg\OpenSalesTax\Plugin;
@@ -10,7 +10,7 @@ use Magento\Framework\DataObject;
 /**
  * Plugin on `Magento\Tax\Model\Calculation::getRate`.
  *
- * Per ADR-001, we hook the narrowest seam — a single rate lookup — instead
+ * Per ADR-001, we hook the narrowest seam â€” a single rate lookup â€” instead
  * of preferencing the public `TaxCalculationInterface`. This plays nicely
  * with merchants who run other tax-adjacent modules.
  *
@@ -20,7 +20,7 @@ use Magento\Framework\DataObject;
  *
  * Fall-through semantics: if the registry has no entry for this quote
  * (because the gate decided non-US/non-USD, or because we are running
- * outside a totals collection — e.g., an admin rate-table preview), the
+ * outside a totals collection â€” e.g., an admin rate-table preview), the
  * original Magento rate flows through unchanged.
  */
 class CalculationPlugin
@@ -61,7 +61,7 @@ class CalculationPlugin
 
     /**
      * The DataObject request carries a `quote_id` key only on totals-driven
-     * lookups. Admin rate-table previews (Stores → Tax → Tax Rates) do not
+     * lookups. Admin rate-table previews (Stores â†’ Tax â†’ Tax Rates) do not
      * carry one, and we let those pass through.
      */
     private function resolveQuoteId(DataObject $request): ?int

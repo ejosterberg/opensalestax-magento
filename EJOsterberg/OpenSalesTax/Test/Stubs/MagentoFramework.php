@@ -1,5 +1,5 @@
 <?php
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 /**
  * Minimal class/interface stubs for the Magento framework types our module
  * touches. Used at test time and by PHPStan so we do not need to install
@@ -16,7 +16,7 @@ declare(strict_types=1);
 namespace Magento\Framework {
     if (!class_exists(__NAMESPACE__ . '\\DataObject', false)) {
         /**
-         * Minimal stub of \Magento\Framework\DataObject — enough for our tests
+         * Minimal stub of \Magento\Framework\DataObject â€” enough for our tests
          * to construct one with an array and read back via getData($key).
          */
         class DataObject
@@ -112,7 +112,7 @@ namespace Magento\Framework\HTTP\Client {
 namespace Magento\Framework\Serialize\Serializer {
     if (!class_exists(__NAMESPACE__ . '\\Json', false)) {
         /**
-         * Functional stub — actually serializes/deserializes JSON, so callers
+         * Functional stub â€” actually serializes/deserializes JSON, so callers
          * relying on JSON-correct behavior get it.
          */
         class Json
@@ -198,9 +198,9 @@ namespace Magento\Framework\App\Config {
          * Magento internals (registry, cache type list, resource model, etc.);
          * we only need enough surface for backend_model unit tests:
          *   - getValue / setValue
-         *   - getFieldsetDataValue(name) — for reading sibling fields from the
+         *   - getFieldsetDataValue(name) â€” for reading sibling fields from the
          *     same admin form submission
-         *   - beforeSave() — the lifecycle hook we override
+         *   - beforeSave() â€” the lifecycle hook we override
          */
         class Value
         {
@@ -308,7 +308,7 @@ namespace Magento\Framework\Data\Collection {
     if (!class_exists(__NAMESPACE__ . '\\AbstractDb', false)) {
         /**
          * Stub of Magento's DB-collection base. Same role as AbstractResource
-         * above — type-only for backend-model ctor signatures.
+         * above â€” type-only for backend-model ctor signatures.
          */
         class AbstractDb
         {

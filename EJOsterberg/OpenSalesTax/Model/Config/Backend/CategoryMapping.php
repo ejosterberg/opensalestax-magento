@@ -1,5 +1,5 @@
 <?php
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 declare(strict_types=1);
 
 namespace EJOsterberg\OpenSalesTax\Model\Config\Backend;
@@ -16,22 +16,22 @@ use Magento\Framework\Registry;
 use Magento\Framework\Serialize\Serializer\Json;
 
 /**
- * Backend model for the Tax-Class → OST-Category Mapping admin field.
+ * Backend model for the Tax-Class â†’ OST-Category Mapping admin field.
  *
- * Accepts two input shapes (defense-in-depth — both paths normalize to
+ * Accepts two input shapes (defense-in-depth â€” both paths normalize to
  * the same on-disk JSON object):
  *   1. JSON string from the v1.3.0 textarea UI:
  *        `{"2":"clothing","3":"groceries"}`
  *   2. Array of rows from a future dynamic-rows widget:
  *        `['row_42' => ['tax_class_id'=>'2','ost_category'=>'clothing']]`
  *
- * Invalid posts throw `LocalizedException` — Magento surfaces these as
+ * Invalid posts throw `LocalizedException` â€” Magento surfaces these as
  * red banners on the admin form. The dropdown UI should never produce
  * them; this is defense against a tampered form post.
  *
  * Constructor uses the `...$parentArgs` pattern (matches ApiUrl) so we
  * don't have to redeclare Magento's full backend-model DI signature
- * (`Context`, `Registry`, etc.) — those classes aren't stubbed for
+ * (`Context`, `Registry`, etc.) â€” those classes aren't stubbed for
  * PHPStan and pulling them in would force a Marketplace composer
  * dependency.
  */
@@ -41,7 +41,7 @@ class CategoryMapping extends Value
      * Use Magento's explicit backend-model parent ctor signature. The
      * `...$parentArgs` variadic style breaks Magento's compiled
      * Interceptor subclasses, which forward parent ctor args BY POSITION
-     * — Position 1 must be `Context`, not our custom dep. (Verified
+     * â€” Position 1 must be `Context`, not our custom dep. (Verified
      * 2026-05-15 via live setup:di:compile on VM 914.)
      *
      * Custom OST deps (`Json`) go AFTER the Magento ones so Interceptor's
@@ -85,7 +85,7 @@ class CategoryMapping extends Value
                 $decoded = $this->json->unserialize($value);
             } catch (\InvalidArgumentException $e) {
                 throw new LocalizedException(
-                    __('OpenSalesTax category mapping must be a JSON object — could not parse: %1', $e->getMessage())
+                    __('OpenSalesTax category mapping must be a JSON object â€” could not parse: %1', $e->getMessage())
                 );
             }
             if (!is_array($decoded)) {

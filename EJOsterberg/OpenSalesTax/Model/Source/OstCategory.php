@@ -1,5 +1,5 @@
 <?php
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 declare(strict_types=1);
 
 namespace EJOsterberg\OpenSalesTax\Model\Source;
@@ -14,7 +14,7 @@ namespace EJOsterberg\OpenSalesTax\Model\Source;
  *
  * Values are the strings sent to the engine in the `category` field
  * of each line item in `POST /v1/calculate`. Empty string is the
- * "skip this line" sentinel — the strategy returns no tax line for
+ * "skip this line" sentinel â€” the strategy returns no tax line for
  * the affected order line, and Magento's built-in tax math handles
  * it (typically zero).
  */

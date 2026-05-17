@@ -1,11 +1,11 @@
 <?php
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 declare(strict_types=1);
 
 // Namespace matches the file's destination inside Magento's integration
 // testsuite directory (`dev/tests/integration/testsuite/EJOsterberg/OpenSalesTax/`)
 // so the SuiteLoader's PSR-4-style discovery finds it. The CI workflow
-// copies this file into that location at run time — see
+// copies this file into that location at run time â€” see
 // `.github/workflows/integration-magento.yml`.
 namespace EJOsterberg\OpenSalesTax;
 
@@ -29,30 +29,30 @@ use PHPUnit\Framework\TestCase;
 /**
  * Mg-1: live-Magento integration test for the OpenSalesTax module.
  *
- * Closes the gap that allowed the v1.3.0 → v1.3.4 six-bug chain in
+ * Closes the gap that allowed the v1.3.0 â†’ v1.3.4 six-bug chain in
  * May 2026 to pass unit-test CI while shipping silently broken cart
- * totals. See CHANGELOG.md (v1.3.0–v1.3.5 entries) for the full
+ * totals. See CHANGELOG.md (v1.3.0â€“v1.3.5 entries) for the full
  * post-mortem.
  *
  * What this test exercises that unit tests structurally cannot:
  *
- *  1. **Real DI compilation** — boots Magento's ObjectManager, which
- *     compiles `…\Interceptor` subclasses over `Quote` / `Address` /
- *     `Total` etc. (Bugs A, C, D — all silent at unit-test time.)
+ *  1. **Real DI compilation** â€” boots Magento's ObjectManager, which
+ *     compiles `â€¦\Interceptor` subclasses over `Quote` / `Address` /
+ *     `Total` etc. (Bugs A, C, D â€” all silent at unit-test time.)
  *
- *  2. **The canonical `Tax::collect()` code path** —
- *     `$quote->collectTotals()` → `CollectTotalsObserver` →
- *     `Magento\Tax\Model\Sales\Total\Quote\Tax::collect()` → our
+ *  2. **The canonical `Tax::collect()` code path** â€”
+ *     `$quote->collectTotals()` â†’ `CollectTotalsObserver` â†’
+ *     `Magento\Tax\Model\Sales\Total\Quote\Tax::collect()` â†’ our
  *     `QuoteTotalsTaxPlugin::beforeCollect` / `afterCollect`.
  *     Bugs C + D + E + F all manifest only here.
  *
- *  3. **Magic-getter dispatch** — `$quote->getQuoteCurrencyCode()`,
+ *  3. **Magic-getter dispatch** â€” `$quote->getQuoteCurrencyCode()`,
  *     `$item->getRowTotal()`, etc. are routed through `__call` on
  *     the Interceptor. `method_exists()` returns false on these;
  *     `is_callable()` returns true. (Bug E in `beforeCollect`,
  *     Bug F#1 in `afterCollect`.)
  *
- *  4. **The canonical totals-write sequence** — Magento's
+ *  4. **The canonical totals-write sequence** â€” Magento's
  *     grand-total roll-up reads from `$total->getTaxAmount()` /
  *     `$total->getTotalAmount('tax')`, not from `applied_taxes`.
  *     `afterCollect` must call `setTaxAmount` / `setBaseTaxAmount` /
@@ -65,7 +65,7 @@ use PHPUnit\Framework\TestCase;
  *
  * Mock engine: a Node.js HTTP server started by the CI workflow on
  * `127.0.0.1:8080`. Returns an MN compound-rate response (9.025% on
- * a $100 cart → $9.025 tax). See `mock-engine/server.js` and
+ * a $100 cart â†’ $9.025 tax). See `mock-engine/server.js` and
  * `fixtures/minnesota-cart.json`.
  */
 class LiveMagentoTaxTest extends TestCase
@@ -112,7 +112,7 @@ class LiveMagentoTaxTest extends TestCase
      */
     public function testCollectTotalsAppliesEngineTaxOnMinnesotaCart(): void
     {
-        // Sanity probe — fail fast with a clear message if the mock engine
+        // Sanity probe â€” fail fast with a clear message if the mock engine
         // isn't reachable, so a misconfigured workflow doesn't masquerade
         // as a module bug.
         $this->assertMockEngineReachable();
@@ -137,7 +137,7 @@ class LiveMagentoTaxTest extends TestCase
         );
 
         // Tight bound: the mock returns 9.025% of $100 = $9.025.
-        // Allow ±$0.01 for Magento's internal rounding.
+        // Allow Â±$0.01 for Magento's internal rounding.
         $this->assertEqualsWithDelta(
             9.025,
             (float)$shippingAddress->getTaxAmount(),

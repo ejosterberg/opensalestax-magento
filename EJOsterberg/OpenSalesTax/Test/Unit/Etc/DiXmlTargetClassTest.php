@@ -1,5 +1,5 @@
 <?php
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 declare(strict_types=1);
 
 namespace EJOsterberg\OpenSalesTax\Test\Unit\Etc;
@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
 use SimpleXMLElement;
 
 /**
- * Regression test for Bug C (latent v0.1.0 → v1.3.1).
+ * Regression test for Bug C (latent v0.1.0 â†’ v1.3.1).
  *
  * `etc/di.xml` registered the totals plugin against
  * `Magento\Quote\Model\Quote\Address\Total\Tax`, a class that does NOT
@@ -16,7 +16,7 @@ use SimpleXMLElement;
  * `Magento\Tax\Model\Sales\Total\Quote\Tax`). Magento's DI compiler
  * silently no-ops plugins on non-existent target classes, so
  * `setup:di:compile` exited clean and the bug only surfaced under a
- * real `collectTotals()` call — three full minor-version cycles later.
+ * real `collectTotals()` call â€” three full minor-version cycles later.
  *
  * This test parses every `<type name="...">` in `di.xml` and asserts
  * the named class either:
@@ -35,7 +35,7 @@ final class DiXmlTargetClassTest extends TestCase
 {
     /**
      * Every Magento class our `di.xml` plugins target. Each entry MUST
-     * be verified against a real Magento checkout — the comment names
+     * be verified against a real Magento checkout â€” the comment names
      * the canonical source path. These are NOT stubbed (no need; the
      * plugin code uses duck-typing on the subjects), so this allowlist
      * IS the safety net.
@@ -55,7 +55,7 @@ final class DiXmlTargetClassTest extends TestCase
      * accidentally re-introduces it, this test fails loudly.
      */
     private const KNOWN_BAD_CLASSES = [
-        // Bug C — does NOT exist in Magento 2.4.7. The Quote module's
+        // Bug C â€” does NOT exist in Magento 2.4.7. The Quote module's
         // `Address\Total\Tax` namespace doesn't house a totals collector;
         // the Tax module owns the collector.
         'Magento\Quote\Model\Quote\Address\Total\Tax',
@@ -94,7 +94,7 @@ final class DiXmlTargetClassTest extends TestCase
         self::assertGreaterThan(
             0,
             $checked,
-            'di.xml has no <type name="..."> elements — test fixture is wrong.'
+            'di.xml has no <type name="..."> elements â€” test fixture is wrong.'
         );
 
         self::assertSame(

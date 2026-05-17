@@ -70,4 +70,4 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for branch model, DCO sign-off, and the
 
 ## License
 
-Apache-2.0. See [`LICENSE`](LICENSE).
+Dual-licensed under your choice of [Apache-2.0](LICENSE-APACHE.txt) OR [GPL-2.0-or-later](LICENSE-GPL.txt). See [`LICENSE`](LICENSE).

@@ -1,5 +1,5 @@
 <?php
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 declare(strict_types=1);
 
 namespace EJOsterberg\OpenSalesTax\Model;
@@ -38,7 +38,7 @@ namespace EJOsterberg\OpenSalesTax\Model;
  * a synthetic 0-based string index since the engine no longer emits
  * `line_id` (kept for shape stability of `lineTaxes`).
  *
- * `shipping_tax` is no longer a top-level field — shipping is folded
+ * `shipping_tax` is no longer a top-level field â€” shipping is folded
  * into `lines[]` as a category. Kept on the DTO for backward-compat
  * (defaults to 0.0); deprecated.
  */
@@ -123,7 +123,7 @@ class OstaxResponse
      * Parse a single line. Returns null when the line is unparseable.
      *
      * Accepts BOTH the v0.58+ shape (no line_id, `rate_pct` percent string)
-     * and the legacy shape (`line_id`, `rate` decimal float) — the legacy
+     * and the legacy shape (`line_id`, `rate` decimal float) â€” the legacy
      * support lets older engines on a slow upgrade cycle keep working.
      *
      * @param mixed $line

@@ -1,5 +1,5 @@
 <?php
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 declare(strict_types=1);
 
 namespace EJOsterberg\OpenSalesTax\Model\Validator;
@@ -52,7 +52,7 @@ class ApiUrlValidator
      *     backend_model translates this to a Magento LocalizedException.
      * @return string|null The resolved IP to pin (when restrict-to-public-IPs
      *     is on and validation succeeds), or null when no pin is required
-     *     (empty input, or restrict-to-public-IPs is off — the runtime cURL
+     *     (empty input, or restrict-to-public-IPs is off â€” the runtime cURL
      *     client uses normal DNS in that case).
      */
     public function validate(string $url): ?string

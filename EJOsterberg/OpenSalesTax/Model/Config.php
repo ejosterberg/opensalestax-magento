@@ -1,5 +1,5 @@
 <?php
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 declare(strict_types=1);
 
 namespace EJOsterberg\OpenSalesTax\Model;
@@ -69,7 +69,7 @@ class Config
     /**
      * Whether the merchant has opted into fail-hard behavior.
      *
-     * Default (constitution §8) is false — the module falls back to Magento's
+     * Default (constitution Â§8) is false â€” the module falls back to Magento's
      * built-in tax tables when the engine is unreachable.
      */
     public function isFailHard(?string $scopeCode = null): bool
@@ -107,7 +107,7 @@ class Config
     /**
      * Returns the pinned IP the backend_model captured at save time, or empty
      * string if no pin is in place. Used by `OstaxClient` to force `CURLOPT_RESOLVE`
-     * so the runtime cURL connection bypasses DNS — defends against DNS rebinding.
+     * so the runtime cURL connection bypasses DNS â€” defends against DNS rebinding.
      */
     public function getPinnedIp(?string $scopeCode = null): string
     {
@@ -122,7 +122,7 @@ class Config
     /**
      * Returns the merchant-configured map of `magento_tax_class_id` to OST
      * category. Returns an empty array when unset, malformed, or the stored
-     * value is not a JSON object — fail-soft, never throws.
+     * value is not a JSON object â€” fail-soft, never throws.
      *
      * @return array<int, string>
      */
@@ -162,7 +162,7 @@ class Config
      * Resolve the OST category to send for a given Magento product tax class.
      * Falls back to `DEFAULT_CATEGORY` ('general') when unmapped.
      *
-     * Hot path — called for every line on every quote-total recompute.
+     * Hot path â€” called for every line on every quote-total recompute.
      * Callers should cache the mapping array once per request lifecycle
      * via `getCategoryMapping()` rather than calling this method
      * repeatedly inside a tight loop.
