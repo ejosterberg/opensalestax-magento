@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (Mg-1 incubation harness, CI-only)
+
+Six follow-up commits to the v1.3.6 Mg-1 workflow + test, landed on `main`
+post-v1.3.7. These touch only `.github/workflows/integration-magento.yml`
+and `tests/Integration/` — the actual Magento module code installed by
+merchants is byte-identical to v1.3.7, so no patch release is cut for
+these. They roll into the next tag (v1.3.8 or v1.4.x):
+
+- `21d4e77` — untyped objectManager property + parent::setUp() call
+  (matches every Magento integration test pattern under `vendor/magento/inventory/`)
+- `0ebac97` — retry composer steps on Mage-OS mirror flake + ASCII-only workflow
+- `1fee200` — replace `CartManagement::createEmptyCart` with direct Quote create
+  (avoids one Magento 2.4.7-p3 DI bug surface)
+- `fc71a39` — disable `InventoryDistanceBasedSourceSelection` (Magento 2.4.7-p3 DI bug)
+- `ba047b3` — use virtual product fixture to bypass remaining DI surface
+- `8336662` — switch to Magento 2.4.6-p10 + keep virtual-product fixture
+- `1fe71b8` — docs(ci): mark workflow as incubation; document upstream blockers
+
+End state: workflow installs Magento + boots ObjectManager + runs test
+discovery successfully, but `$quote->collectTotals()` itself still hits
+upstream Magento OSS bugs in both 2.4.7-p3 and 2.4.6-p10. Marked
+`continue-on-error: true` for now; the actual Mg-1 assertion will arm
+when one of: (1) Adobe ships 2.4.7-p4 or 2.4.6-p11; (2) we add an
+explicit DI override for `GetLatsLngsFromAddressInterface` (improvement
+queue Mg-1.1); (3) we move to a leaner harness off `dev/tests/integration`
+(improvement queue Mg-1.2).
+
 ## [1.3.7] - 2026-05-17
 
 ### Changed
