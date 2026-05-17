@@ -70,10 +70,22 @@ use PHPUnit\Framework\TestCase;
  */
 class LiveMagentoTaxTest extends TestCase
 {
-    private ObjectManagerInterface $objectManager;
+    /**
+     * @var ObjectManagerInterface|null
+     *
+     * Untyped property by intent — Magento's test framework does
+     * reflection-based property handling in some annotation paths,
+     * which can raise a `Cannot assign null to property of type X`
+     * TypeError when the property is strictly typed and non-nullable.
+     * Untyped + PHPDoc matches the convention used by every test
+     * class under Magento's own integration test directories
+     * (see vendor/magento/inventory/<module>/Test/Integration/).
+     */
+    private $objectManager;
 
     protected function setUp(): void
     {
+        parent::setUp();
         $objectManager = Bootstrap::getObjectManager();
         if (!$objectManager instanceof ObjectManagerInterface) {
             self::fail(
