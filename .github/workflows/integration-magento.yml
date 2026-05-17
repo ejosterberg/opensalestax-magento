@@ -216,36 +216,41 @@ jobs:
           mysql --host 127.0.0.1 --port 3306 -u root -prootpw \
             -e "SET GLOBAL log_bin_trust_function_creators = 1;"
 
-      - name: Copy LiveMagentoTaxTest into Magento's integration harness
-        # Magento's PHPUnit bootstrap (dev/tests/integration/phpunit.xml.dist)
-        # auto-includes the installed module's `Test/Integration` directory
-        # via PSR-4 (it walks vendor/<vendor>/<package>/Test/Integration).
-        # composer install dropped our module at:
-        #   ${MAGENTO_DIR}/vendor/ejosterberg/module-opensalestax/
-        # We need our integration test there, namespaced under
-        # EJOsterberg\OpenSalesTax\Test\Integration to match the composer.json
-        # autoload-dev PSR-4 prefix.
+      - name: Copy LiveMagentoTaxTest into Magento's integration testsuite
+        # Magento's integration phpunit.xml.dist defines a "Real Suite"
+        # that auto-discovers tests in `testsuite/` AND in
+        # `app/code/*/*/Test/Integration`, NOT in `vendor/`. Critically,
+        # the SuiteLoader (`Magento\TestFramework\SuiteLoader`) only
+        # initializes the per-test ObjectManager when tests are loaded
+        # via the testsuite mechanism — invoking PHPUnit on a single
+        # file path bypasses the loader and leaves
+        # `Bootstrap::getObjectManager()` returning null.
+        #
+        # We therefore drop the test into `testsuite/EJOsterberg/`
+        # (covered by `<directory>testsuite</directory>` in the Real
+        # Suite) AND filter by class name when running. This gets us
+        # the ObjectManager-initialized lifecycle while skipping the
+        # rest of Magento's 10k-test integration corpus.
         run: |
-          VENDOR_DIR="${MAGENTO_DIR}/vendor/ejosterberg/module-opensalestax/EJOsterberg/OpenSalesTax/Test"
-          mkdir -p "${VENDOR_DIR}/Integration"
+          TEST_DIR="${MAGENTO_DIR}/dev/tests/integration/testsuite/EJOsterberg/OpenSalesTax"
+          mkdir -p "${TEST_DIR}"
           cp opensalestax-magento/tests/Integration/LiveMagentoTaxTest.php \
-            "${VENDOR_DIR}/Integration/LiveMagentoTaxTest.php"
+            "${TEST_DIR}/LiveMagentoTaxTest.php"
           # Sanity-check the file is in place and parseable.
-          php -l "${VENDOR_DIR}/Integration/LiveMagentoTaxTest.php"
+          php -l "${TEST_DIR}/LiveMagentoTaxTest.php"
 
       - name: Run LiveMagentoTaxTest
         working-directory: ${{ env.MAGENTO_DIR }}/dev/tests/integration
         env:
           OSTAX_TEST_ENGINE_URL: ${{ env.OSTAX_TEST_ENGINE_URL }}
-        # Magento's integration phpunit.xml.dist already wires the
-        # TestFramework bootstrap. We point it at exactly our test file
-        # so we don't pay the cost of running Magento's full ~10k-test
-        # integration suite.
+        # Run via the "Real Suite" testsuite so Magento's SuiteLoader
+        # initializes the ObjectManager. `--filter LiveMagentoTaxTest`
+        # narrows the run to our single class.
         run: |
           ../../../vendor/bin/phpunit \
-            --bootstrap framework/bootstrap.php \
             --configuration phpunit.xml.dist \
-            ../../../vendor/ejosterberg/module-opensalestax/EJOsterberg/OpenSalesTax/Test/Integration/LiveMagentoTaxTest.php
+            --testsuite "Magento Integration Tests Real Suite" \
+            --filter '/^EJOsterberg\\OpenSalesTax\\LiveMagentoTaxTest::/'
 
       - name: Dump mock engine log on failure
         if: failure()

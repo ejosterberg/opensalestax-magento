@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 declare(strict_types=1);
 
-namespace EJOsterberg\OpenSalesTax\Test\Integration;
+// Namespace matches the file's destination inside Magento's integration
+// testsuite directory (`dev/tests/integration/testsuite/EJOsterberg/OpenSalesTax/`)
+// so the SuiteLoader's PSR-4-style discovery finds it. The CI workflow
+// copies this file into that location at run time — see
+// `.github/workflows/integration-magento.yml`.
+namespace EJOsterberg\OpenSalesTax;
 
 use Magento\Catalog\Api\ProductRepositoryInterface;
 use Magento\Catalog\Model\Product;
@@ -69,7 +74,16 @@ class LiveMagentoTaxTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->objectManager = Bootstrap::getObjectManager();
+        $objectManager = Bootstrap::getObjectManager();
+        if (!$objectManager instanceof ObjectManagerInterface) {
+            self::fail(
+                'Magento\TestFramework\Helper\Bootstrap::getObjectManager() returned null. '
+                . 'This usually means the test was loaded via a PHPUnit path argument instead '
+                . 'of via the Magento testsuite (which initializes the ObjectManager per test). '
+                . 'Run via `--testsuite "Magento Integration Tests Real Suite" --filter LiveMagentoTaxTest`.'
+            );
+        }
+        $this->objectManager = $objectManager;
         $this->configureOpenSalesTaxModule();
     }
 
