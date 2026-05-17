@@ -1,0 +1,39 @@
+{
+    "_comment": "Fixture for the Mg-1 live-Magento integration test. The PHP test code builds the actual Quote object from these values via Magento's ObjectManager — this file is documentation + a single source of truth so future scenarios are easy to add. See docs/INTEGRATION-TEST.md.",
+
+    "address": {
+        "firstname": "Test",
+        "lastname": "Customer",
+        "street": ["100 N 6th St"],
+        "city": "Minneapolis",
+        "region": "MN",
+        "region_id": 35,
+        "postcode": "55401",
+        "country_id": "US",
+        "telephone": "612-555-0100"
+    },
+
+    "product": {
+        "sku": "OSTAX-MN-FIXTURE-1",
+        "name": "OST Mg-1 Fixture Product",
+        "price": 100.00,
+        "tax_class_id": 2,
+        "type": "simple",
+        "attribute_set_id": 4,
+        "visibility": 4,
+        "status": 1,
+        "stock_data": {
+            "qty": 100,
+            "is_in_stock": 1,
+            "manage_stock": 1
+        }
+    },
+
+    "currency": "USD",
+
+    "expected_engine_response": {
+        "_note": "What the mock engine returns for this fixture. Matches portfolio VM-916/918/919 fixtures (MN compound rate of 9.025%: 6.875% state + 0.15% Hennepin County + 2.0% Minneapolis).",
+        "rate_pct": 9.025,
+        "tax_total_for_100_dollar_cart": 9.025
+    }
+}

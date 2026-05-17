@@ -1,0 +1,258 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Mg-1: live-Magento integration test for opensalestax-magento.
+#
+# Why this workflow exists: the v1.3.0 → v1.3.4 six-bug chain (May 2026)
+# shipped silently broken cart totals because Magento's Interceptor + DI +
+# canonical-totals-write behavior is structurally unreachable from unit
+# tests. This workflow spins up a real Magento install + a mock OST engine
+# and drives `$quote->collectTotals()` end-to-end on an MN fixture, then
+# asserts `$shippingAddress->getTaxAmount() > 0`. That single assertion
+# would have caught Bugs C + D + E + F at PR time.
+#
+# Stack choice — Mage-OS over markshust/docker-magento:
+#   - Mage-OS publishes a Marketplace-credential-free Magento mirror
+#     (https://mirror.mage-os.org/), so this workflow works on fork PRs.
+#     markshust pulls from repo.magento.com which needs Adobe Marketplace
+#     keys — those can't be exposed to fork PRs, which would defeat the
+#     "every PR" goal in `improvement-queue/Mg-1`.
+#   - Mage-OS ships `setup-magento` + `setup-install` GitHub Actions that
+#     wire up Magento against runner-provided MySQL/ES/RabbitMQ services
+#     in ~3-5 min. No docker-compose-in-CI dance.
+#   - Magento's own `dev/tests/integration/` PHPUnit harness boots a full
+#     ObjectManager — same Interceptor + DI surface that the unit tests
+#     cannot reach.
+#
+# Run time budget: ~12 min per PR (cold Magento install ~5 min;
+# module require + di:compile ~2 min; integration test ~30s;
+# rest is checkout / setup overhead). Cached composer packages cut
+# subsequent runs to ~7 min.
+
+name: integration-magento
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel in-progress runs on the same ref when a new commit lands —
+# the integration job is long enough that double-running is wasteful.
+concurrency:
+  group: integration-magento-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live-magento-integration:
+    name: Live Magento ${{ matrix.magento }} / PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25  # hard ceiling — see budget above
+    strategy:
+      fail-fast: false
+      matrix:
+        # First-cut matrix: single Magento + PHP combo to keep wall-clock
+        # reasonable. Expand to 2.4.5 / 2.4.6 in v1.4.x once the baseline
+        # is reliably green — see CHANGELOG entry for v1.3.6.
+        include:
+          - php: "8.2"
+            magento: "2.4.7-p3"
+
+    services:
+      # Magento setup:install needs MySQL 8 (2.4.7-p3) + OpenSearch 2.x
+      # (replaces Elasticsearch on 2.4.6+). RabbitMQ is optional for our
+      # test path (we only exercise quote totals, not async events) but
+      # cheap to include and matches what `bin/magento setup:install`
+      # expects by default.
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpw
+          MYSQL_DATABASE: magento_integration_tests
+          MYSQL_USER: magento
+          MYSQL_PASSWORD: magento
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -prootpw"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+      opensearch:
+        image: opensearchproject/opensearch:2
+        env:
+          discovery.type: single-node
+          plugins.security.disabled: "true"
+          OPENSEARCH_INITIAL_ADMIN_PASSWORD: "OstaxIntegrationTest_1!"
+        ports:
+          - 9200:9200
+        options: >-
+          --health-cmd="curl -sf http://localhost:9200/_cluster/health || exit 1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      # Where the mock engine listens. Used by both the workflow's
+      # background-process step AND the PHPUnit test
+      # (LiveMagentoTaxTest::assertMockEngineReachable).
+      OSTAX_TEST_ENGINE_URL: http://127.0.0.1:8080
+      # Where Mage-OS setup-magento drops the install.
+      MAGENTO_DIR: ${{ github.workspace }}/_magento
+
+    steps:
+      - name: Checkout module source
+        uses: actions/checkout@v4
+        with:
+          path: opensalestax-magento
+
+      - name: Set up Node 24 (for the mock OST engine)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Start mock OST engine in background
+        # The mock listens on 127.0.0.1:8080 and writes a one-line
+        # JSON log to stderr on every /v1/calculate. We tail it in
+        # the test logs if the test fails (see "Dump mock engine
+        # log on failure" below).
+        run: |
+          mkdir -p "${{ runner.temp }}/mock-engine"
+          nohup node opensalestax-magento/tests/Integration/mock-engine/server.js \
+            > "${{ runner.temp }}/mock-engine/stdout.log" \
+            2> "${{ runner.temp }}/mock-engine/stderr.log" &
+          echo $! > "${{ runner.temp }}/mock-engine/pid"
+          # Wait up to 10s for the listener to come up.
+          for i in $(seq 1 20); do
+            if curl -sf "${OSTAX_TEST_ENGINE_URL}/v1/health" > /dev/null; then
+              echo "mock engine healthy after ${i} poll(s)"
+              exit 0
+            fi
+            sleep 0.5
+          done
+          echo "mock engine failed to start"
+          cat "${{ runner.temp }}/mock-engine/stderr.log" || true
+          exit 1
+
+      - name: Set up PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer:v2
+          # Magento 2.4.7-p3 required extensions per devdocs.
+          extensions: bcmath, ctype, curl, dom, fileinfo, gd, hash, iconv, intl, mbstring, openssl, pdo_mysql, simplexml, soap, sockets, sodium, tokenizer, xmlwriter, xsl, zip
+          coverage: none
+          ini-values: memory_limit=2G
+
+      - name: Cache composer packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-integration-${{ matrix.php }}-${{ matrix.magento }}-${{ hashFiles('opensalestax-magento/composer.json') }}
+          restore-keys: |
+            composer-integration-${{ matrix.php }}-${{ matrix.magento }}-
+            composer-integration-${{ matrix.php }}-
+
+      - name: Create Magento project from Mage-OS mirror
+        # No Adobe Marketplace credentials needed — the Mage-OS mirror
+        # is the credential-free path. `setup-magento` would also work
+        # but we want explicit control of the install directory.
+        run: |
+          composer create-project \
+            --repository-url=https://mirror.mage-os.org/ \
+            "magento/project-community-edition=${{ matrix.magento }}" \
+            "${MAGENTO_DIR}" \
+            --no-install
+          # Pre-create app/etc so the magento-composer-installer plugin
+          # doesn't choke (same fix the Mage-OS `fix-magento-install`
+          # action applies — inlined here for transparency).
+          mkdir -p "${MAGENTO_DIR}/app/etc"
+
+      - name: Allow Magento composer plugins
+        working-directory: ${{ env.MAGENTO_DIR }}
+        run: |
+          composer config --no-interaction allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+          composer config --no-interaction allow-plugins.laminas/laminas-dependency-plugin true
+          composer config --no-interaction allow-plugins.magento/composer-dependency-version-audit-plugin true
+          composer config --no-interaction allow-plugins.magento/composer-root-update-plugin true
+          composer config --no-interaction allow-plugins.magento/magento-composer-installer true
+          composer config --no-interaction allow-plugins.magento/inventory-composer-installer true
+
+      - name: Register module as a path repository
+        working-directory: ${{ env.MAGENTO_DIR }}
+        run: |
+          composer config repositories.opensalestax-local path "${{ github.workspace }}/opensalestax-magento"
+          composer require "ejosterberg/module-opensalestax:@dev" --no-update
+
+      - name: Install Magento dependencies (composer install)
+        working-directory: ${{ env.MAGENTO_DIR }}
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Configure integration test framework
+        working-directory: ${{ env.MAGENTO_DIR }}/dev/tests/integration
+        # Magento's integration test harness reads install config from
+        # etc/install-config-mysql.php. Point it at the runner's
+        # service-container MySQL + OpenSearch on 127.0.0.1.
+        run: |
+          cp etc/install-config-mysql.php.dist etc/install-config-mysql.php
+          sed -i "s|'db-host' => 'localhost'|'db-host' => '127.0.0.1'|" etc/install-config-mysql.php
+          sed -i "s|'db-user' => 'root'|'db-user' => 'root'|" etc/install-config-mysql.php
+          sed -i "s|'db-password' => '123123q'|'db-password' => 'rootpw'|" etc/install-config-mysql.php
+          sed -i "s|'db-name' => 'magento_integration_tests'|'db-name' => 'magento_integration_tests'|" etc/install-config-mysql.php
+          sed -i "s|'amqp-host' => 'localhost'|'amqp-host' => '127.0.0.1'|" etc/install-config-mysql.php
+          sed -i "s|'elasticsearch-host' => 'localhost'|'elasticsearch-host' => '127.0.0.1'|" etc/install-config-mysql.php
+          sed -i "s|'search-engine' => 'elasticsearch7'|'search-engine' => 'opensearch'|" etc/install-config-mysql.php
+          sed -i "s|'opensearch-host' => 'localhost'|'opensearch-host' => '127.0.0.1'|" etc/install-config-mysql.php
+
+      - name: Allow stored function creators in MySQL
+        # Magento's integration setup creates triggers; the default
+        # binary log policy blocks this. One-shot setting via root.
+        run: |
+          mysql --host 127.0.0.1 --port 3306 -u root -prootpw \
+            -e "SET GLOBAL log_bin_trust_function_creators = 1;"
+
+      - name: Copy LiveMagentoTaxTest into Magento's integration harness
+        # Magento's PHPUnit bootstrap (dev/tests/integration/phpunit.xml.dist)
+        # auto-includes the installed module's `Test/Integration` directory
+        # via PSR-4 (it walks vendor/<vendor>/<package>/Test/Integration).
+        # composer install dropped our module at:
+        #   ${MAGENTO_DIR}/vendor/ejosterberg/module-opensalestax/
+        # We need our integration test there, namespaced under
+        # EJOsterberg\OpenSalesTax\Test\Integration to match the composer.json
+        # autoload-dev PSR-4 prefix.
+        run: |
+          VENDOR_DIR="${MAGENTO_DIR}/vendor/ejosterberg/module-opensalestax/EJOsterberg/OpenSalesTax/Test"
+          mkdir -p "${VENDOR_DIR}/Integration"
+          cp opensalestax-magento/tests/Integration/LiveMagentoTaxTest.php \
+            "${VENDOR_DIR}/Integration/LiveMagentoTaxTest.php"
+          # Sanity-check the file is in place and parseable.
+          php -l "${VENDOR_DIR}/Integration/LiveMagentoTaxTest.php"
+
+      - name: Run LiveMagentoTaxTest
+        working-directory: ${{ env.MAGENTO_DIR }}/dev/tests/integration
+        env:
+          OSTAX_TEST_ENGINE_URL: ${{ env.OSTAX_TEST_ENGINE_URL }}
+        # Magento's integration phpunit.xml.dist already wires the
+        # TestFramework bootstrap. We point it at exactly our test file
+        # so we don't pay the cost of running Magento's full ~10k-test
+        # integration suite.
+        run: |
+          ../../../vendor/bin/phpunit \
+            --bootstrap framework/bootstrap.php \
+            --configuration phpunit.xml.dist \
+            ../../../vendor/ejosterberg/module-opensalestax/EJOsterberg/OpenSalesTax/Test/Integration/LiveMagentoTaxTest.php
+
+      - name: Dump mock engine log on failure
+        if: failure()
+        run: |
+          echo "=== mock engine stderr ==="
+          cat "${{ runner.temp }}/mock-engine/stderr.log" || echo "(no stderr log)"
+          echo "=== mock engine stdout ==="
+          cat "${{ runner.temp }}/mock-engine/stdout.log" || echo "(no stdout log)"
+
+      - name: Stop mock engine
+        if: always()
+        run: |
+          PID_FILE="${{ runner.temp }}/mock-engine/pid"
+          if [ -f "$PID_FILE" ]; then
+            kill "$(cat "$PID_FILE")" 2>/dev/null || true
+          fi

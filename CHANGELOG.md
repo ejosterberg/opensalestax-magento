@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.6] - 2026-05-17
+
+### Added
+
+- **Live-Magento CI integration test (Mg-1).** New workflow `.github/workflows/integration-magento.yml` spins up a real Magento 2.4.7-p3 install via the Mage-OS mirror (`https://mirror.mage-os.org/` — no Adobe Marketplace credentials needed, so the workflow works on fork PRs) + a mock OST engine (`tests/Integration/mock-engine/server.js`), installs the module via composer path repo, drops `LiveMagentoTaxTest.php` into Magento's `dev/tests/integration/` harness, and drives `$quote->collectTotals()` on a Minnesota cart fixture. Asserts `$shippingAddress->getTaxAmount() > 0`, that the tax matches the mock engine's 9.025% MN compound rate, and that `$quote->getGrandTotal()` includes the tax. Closes the gap that allowed the v1.3.0 → v1.3.4 six-bug chain in May 2026 to pass unit-test CI while shipping silently broken cart totals — that single `> 0` assertion would have caught Bugs C + D + E + F at PR time. Targets ~12 min wall-clock per PR. Initial matrix is single Magento 2.4.7-p3 + PHP 8.2 entry; matrix expansion to 2.4.5 / 2.4.6 deferred to v1.4.x once the baseline is reliably green. Operator notes (local-run instructions, mock engine API, troubleshooting) in `docs/INTEGRATION-TEST.md`.
+
+### Notes
+
+- Stack choice — **Mage-OS over markshust/docker-magento**. The original Mg-1 brief mentioned markshust as the de-facto community devbox, but it pulls Magento from `repo.magento.com` which requires Adobe Marketplace credentials that cannot be exposed to fork PRs on a public open-source repo. The Mage-OS mirror is the credential-free path for CI (already in use by `mage-os/github-actions/setup-magento`); markshust remains the right choice for the live VM-914 demo deployment. Same architectural goal (live-Magento ObjectManager + DI + Interceptor + canonical-totals-write surface that unit tests cannot reach), different concrete dependency.
+
 ## [1.3.5] - 2026-05-15
 
 ### Fixed
