@@ -17,7 +17,6 @@ use Magento\Catalog\Model\Product\Visibility;
 use Magento\Framework\App\Config\MutableScopeConfigInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\ObjectManagerInterface;
-use Magento\Quote\Api\CartManagementInterface;
 use Magento\Quote\Api\CartRepositoryInterface;
 use Magento\Quote\Model\Quote;
 use Magento\Quote\Model\Quote\Address;
@@ -211,6 +210,13 @@ class LiveMagentoTaxTest extends TestCase
      * Build a Quote with the MN address and the fixture product, persisted
      * to the integration-test sandbox DB so collectTotals() runs against
      * the same shape Magento sees in production.
+     *
+     * Uses ObjectManager::create(Quote::class) + manual ->save() rather
+     * than CartManagementInterface::createEmptyCart() because the latter
+     * requires session/customer context that the integration test sandbox
+     * doesn't have by default. The lower-level pattern is what every
+     * Magento integration test under vendor/magento/inventory/.../
+     * SalesQuoteItem/AddSalesQuoteItem*Test.php uses for the same reason.
      */
     private function createMinnesotaQuote(Product $product): Quote
     {
@@ -218,19 +224,23 @@ class LiveMagentoTaxTest extends TestCase
         $storeManager = $this->objectManager->get(StoreManagerInterface::class);
         $store = $storeManager->getStore();
 
-        /** @var CartManagementInterface $cartManagement */
-        $cartManagement = $this->objectManager->get(CartManagementInterface::class);
         /** @var CartRepositoryInterface $cartRepository */
         $cartRepository = $this->objectManager->get(CartRepositoryInterface::class);
 
-        $cartId = $cartManagement->createEmptyCart();
         /** @var Quote $quote */
-        $quote = $cartRepository->get($cartId);
+        $quote = $this->objectManager->create(Quote::class);
         $quote->setStore($store);
-        $quote->setCurrency();
         $quote->setQuoteCurrencyCode('USD');
         $quote->setBaseCurrencyCode('USD');
         $quote->setStoreCurrencyCode('USD');
+        $quote->setIsActive(true);
+        $quote->setIsMultiShipping(false);
+        // Use Customer guest checkout - matches the common Magento checkout
+        // path that the six-bug evening surfaced bugs on.
+        $quote->setCustomerEmail('mg1-fixture@example.com');
+        $quote->setCustomerIsGuest(true);
+        $quote->setCustomerFirstname('Test');
+        $quote->setCustomerLastname('Customer');
 
         $quote->addProduct($product, 1);
 
