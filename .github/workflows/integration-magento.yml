@@ -232,6 +232,17 @@ jobs:
           # Drop every line that contains an 'amqp-' config key. The
           # remaining commas in the array literal are still valid PHP.
           sed -i "/'amqp-/d" etc/install-config-mysql.php
+          # Disable InventoryDistanceBasedSourceSelection (Magento OSS
+          # 2.4.7-p3 ships a DI bug where GetGeoCodesForAddress declares
+          # ClientInterface but is wired with Curl - DI fails any time
+          # the multi-source-inventory checker runs against a quote
+          # item with a stock_id set). This module isn't on the path
+          # we exercise (single-source default stock), so disabling it
+          # is loss-less for the test's coverage of the OST plugin.
+          sed -i "s|'disable-modules' => .*|'disable-modules' => 'Magento_InventoryDistanceBasedSourceSelection,Magento_InventoryDistanceBasedSourceSelectionAdminUi,Magento_InventoryDistanceBasedSourceSelectionApi',|" etc/install-config-mysql.php
+          # If the .dist didn't have a disable-modules key at all, inject one before the closing bracket.
+          grep -q "'disable-modules'" etc/install-config-mysql.php \
+            || sed -i "s|^];|    'disable-modules' => 'Magento_InventoryDistanceBasedSourceSelection,Magento_InventoryDistanceBasedSourceSelectionAdminUi,Magento_InventoryDistanceBasedSourceSelectionApi',\n];|" etc/install-config-mysql.php
           echo "=== effective install-config-mysql.php ==="
           cat etc/install-config-mysql.php
 
