@@ -2,7 +2,7 @@
 #
 # Mg-1: live-Magento integration test for opensalestax-magento.
 #
-# Why this workflow exists: the v1.3.0 â†’ v1.3.4 six-bug chain (May 2026)
+# Why this workflow exists: the v1.3.0 -> v1.3.4 six-bug chain (May 2026)
 # shipped silently broken cart totals because Magento's Interceptor + DI +
 # canonical-totals-write behavior is structurally unreachable from unit
 # tests. This workflow spins up a real Magento install + a mock OST engine
@@ -10,17 +10,17 @@
 # asserts `$shippingAddress->getTaxAmount() > 0`. That single assertion
 # would have caught Bugs C + D + E + F at PR time.
 #
-# Stack choice â€” Mage-OS over markshust/docker-magento:
+# Stack choice - Mage-OS over markshust/docker-magento:
 #   - Mage-OS publishes a Marketplace-credential-free Magento mirror
 #     (https://mirror.mage-os.org/), so this workflow works on fork PRs.
 #     markshust pulls from repo.magento.com which needs Adobe Marketplace
-#     keys â€” those can't be exposed to fork PRs, which would defeat the
+#     keys - those can't be exposed to fork PRs, which would defeat the
 #     "every PR" goal in `improvement-queue/Mg-1`.
 #   - Mage-OS ships `setup-magento` + `setup-install` GitHub Actions that
 #     wire up Magento against runner-provided MySQL/ES/RabbitMQ services
 #     in ~3-5 min. No docker-compose-in-CI dance.
 #   - Magento's own `dev/tests/integration/` PHPUnit harness boots a full
-#     ObjectManager â€” same Interceptor + DI surface that the unit tests
+#     ObjectManager - same Interceptor + DI surface that the unit tests
 #     cannot reach.
 #
 # Run time budget: ~12 min per PR (cold Magento install ~5 min;
@@ -35,7 +35,7 @@ on:
     branches: [main]
   pull_request:
 
-# Cancel in-progress runs on the same ref when a new commit lands â€”
+# Cancel in-progress runs on the same ref when a new commit lands -
 # the integration job is long enough that double-running is wasteful.
 concurrency:
   group: integration-magento-${{ github.ref }}
@@ -45,13 +45,13 @@ jobs:
   live-magento-integration:
     name: Live Magento ${{ matrix.magento }} / PHP ${{ matrix.php }}
     runs-on: ubuntu-latest
-    timeout-minutes: 25  # hard ceiling â€” see budget above
+    timeout-minutes: 25  # hard ceiling - see budget above
     strategy:
       fail-fast: false
       matrix:
         # First-cut matrix: single Magento + PHP combo to keep wall-clock
         # reasonable. Expand to 2.4.5 / 2.4.6 in v1.4.x once the baseline
-        # is reliably green â€” see CHANGELOG entry for v1.3.6.
+        # is reliably green - see CHANGELOG entry for v1.3.6.
         include:
           - php: "8.2"
             magento: "2.4.7-p3"
@@ -153,18 +153,31 @@ jobs:
             composer-integration-${{ matrix.php }}-
 
       - name: Create Magento project from Mage-OS mirror
-        # No Adobe Marketplace credentials needed â€” the Mage-OS mirror
+        # No Adobe Marketplace credentials needed - the Mage-OS mirror
         # is the credential-free path. `setup-magento` would also work
         # but we want explicit control of the install directory.
+        #
+        # Retry up to 3x: mirror.mage-os.org occasionally returns
+        # HTTP 520 (Cloudflare origin error) for stretches of 1-2
+        # minutes. The artifacts themselves are stable; this is purely
+        # CDN flake. Don't fail the build on transient mirror issues.
         run: |
-          composer create-project \
-            --repository-url=https://mirror.mage-os.org/ \
-            "magento/project-community-edition=${{ matrix.magento }}" \
-            "${MAGENTO_DIR}" \
-            --no-install
+          for attempt in 1 2 3; do
+            if composer create-project \
+              --repository-url=https://mirror.mage-os.org/ \
+              "magento/project-community-edition=${{ matrix.magento }}" \
+              "${MAGENTO_DIR}" \
+              --no-install; then
+              break
+            fi
+            echo "create-project failed (attempt ${attempt}); waiting before retry"
+            rm -rf "${MAGENTO_DIR}"
+            sleep $((attempt * 15))
+          done
+          test -d "${MAGENTO_DIR}" || { echo "Mage-OS mirror unreachable after 3 retries"; exit 1; }
           # Pre-create app/etc so the magento-composer-installer plugin
           # doesn't choke (same fix the Mage-OS `fix-magento-install`
-          # action applies â€” inlined here for transparency).
+          # action applies - inlined here for transparency).
           mkdir -p "${MAGENTO_DIR}/app/etc"
 
       - name: Allow Magento composer plugins
@@ -184,15 +197,28 @@ jobs:
           composer require "ejosterberg/module-opensalestax:@dev" --no-update
 
       - name: Install Magento dependencies (composer install)
+        # Same retry rationale as the create-project step above:
+        # the Mage-OS mirror sporadically returns HTTP 520. Composer's
+        # own retry-once behavior isn't enough on a sustained outage.
         working-directory: ${{ env.MAGENTO_DIR }}
-        run: composer install --no-interaction --prefer-dist
+        run: |
+          for attempt in 1 2 3; do
+            if composer install --no-interaction --prefer-dist; then
+              break
+            fi
+            echo "composer install failed (attempt ${attempt}); waiting before retry"
+            sleep $((attempt * 15))
+          done
+          # Validate the module is actually installed.
+          test -f vendor/ejosterberg/module-opensalestax/EJOsterberg/OpenSalesTax/registration.php \
+            || { echo "Module install verification failed"; exit 1; }
 
       - name: Configure integration test framework
         working-directory: ${{ env.MAGENTO_DIR }}/dev/tests/integration
         # Magento's integration test harness reads install config from
         # etc/install-config-mysql.php. Point it at the runner's
         # service-container MySQL + OpenSearch on 127.0.0.1, and strip
-        # AMQP entries â€” we don't run RabbitMQ as a service (our test
+        # AMQP entries - we don't run RabbitMQ as a service (our test
         # path only exercises quote totals, not async events) and
         # Magento 2.4.7-p3's setup:install treats a failed AMQP probe
         # as a hard error rather than skipping it.
@@ -222,7 +248,7 @@ jobs:
         # `app/code/*/*/Test/Integration`, NOT in `vendor/`. Critically,
         # the SuiteLoader (`Magento\TestFramework\SuiteLoader`) only
         # initializes the per-test ObjectManager when tests are loaded
-        # via the testsuite mechanism â€” invoking PHPUnit on a single
+        # via the testsuite mechanism - invoking PHPUnit on a single
         # file path bypasses the loader and leaves
         # `Bootstrap::getObjectManager()` returning null.
         #
