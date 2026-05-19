@@ -373,6 +373,36 @@ jobs:
           echo "=== mock engine stdout ==="
           cat "${{ runner.temp }}/mock-engine/stdout.log" || echo "(no stdout log)"
 
+      - name: Dump Magento var/log/*.log on failure (Mg-1.2 diagnostic)
+        if: failure()
+        # If QuoteTotalsTaxPlugin::beforeCollect actually fired, we'll
+        # see "opensalestax: engine /v1/calculate ok" or
+        # "opensalestax: engine call failed; applying fail-soft policy"
+        # in system.log (the plugin's only INFO/WARNING log sites).
+        # If those messages are absent, the plugin never entered →
+        # something between $quote->collectTotals() and Tax::collect()
+        # is bypassing the plugin chain entirely.
+        run: |
+          echo "=== Magento system.log (filtered for OST + tax) ==="
+          if [ -d "${MAGENTO_DIR}/dev/tests/integration/tmp/sandbox-default-/var/log" ]; then
+            ls -la "${MAGENTO_DIR}/dev/tests/integration/tmp/sandbox-default-/var/log" || true
+            grep -iE "opensalestax|EJOsterberg|tax|collect" "${MAGENTO_DIR}/dev/tests/integration/tmp/sandbox-default-/var/log/"*.log 2>/dev/null | head -200 || echo "(no matches)"
+          else
+            echo "(no integration sandbox log dir found)"
+          fi
+          echo ""
+          echo "=== any log under MAGENTO_DIR var/log ==="
+          find "${MAGENTO_DIR}" -path '*/var/log/*.log' -maxdepth 8 2>/dev/null | while read f; do
+            echo "--- $f ---"
+            grep -iE "opensalestax|EJOsterberg" "$f" 2>/dev/null | head -50
+          done
+          echo ""
+          echo "=== sandbox app/etc/config.php (modules list) ==="
+          find "${MAGENTO_DIR}" -name "config.php" -path '*/app/etc/*' -maxdepth 12 2>/dev/null | while read f; do
+            echo "--- $f ---"
+            grep -i "EJOsterberg" "$f" || echo "  (no EJOsterberg in $f)"
+          done
+
       - name: Stop mock engine
         if: always()
         run: |
