@@ -7,6 +7,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.13] - 2026-05-19
+
+### Investigation progress (Mg-1.2 still red)
+
+- **Significantly improved Mg-1 CI test diagnostics, narrowed root
+  cause** — but the assertion `$address->getTaxAmount() > 0` still
+  fails. The Mg-1 workflow stays armed (no `continue-on-error`); the
+  red CI signal is now actionable rather than mysterious.
+  Diagnostic findings from the v1.3.11–v1.3.13 iteration cycle (each
+  observation came from a new `[MG-1-DIAG]` STDERR line emitted by
+  the test right before `$quote->collectTotals()`):
+  - `module_ost_enabled: true`, `module_stub_enabled: true` — both
+    modules ARE installed in the sandbox.
+  - `store_code: "default"`, `api_url_at_default / api_url_at_store /
+    api_url_at_store_null_code` all return `"http://127.0.0.1:8080"`
+    — config flow from `MutableScopeConfigInterface::setValue` to
+    `ScopeConfigInterface::getValue` works correctly (resolved by
+    v1.3.11's SCOPE_TYPE_DEFAULT write).
+  - `totals_interceptor_loadable: true`,
+    `totals_resolved_class: "Magento\\Tax\\Model\\Sales\\Total\\Quote\\Tax\\Interceptor"`
+    — the totals collector's Interceptor subclass is generated.
+  - `ost_plugins_registered.__getNext_collect__: {"1": ["ejosterberg_opensalestax_quote_totals_tax"], "4": ["ejosterberg_opensalestax_quote_totals_tax"]}`
+    — the OST plugin IS in the runtime PluginListInterface chain
+    for the `collect` method at both LISTENER_BEFORE (1) and
+    LISTENER_AFTER (4) positions.
+  - mock engine stderr: `listen` event present, NO `calculate`
+    events — the engine never received a `/v1/calculate` POST.
+  - `var/log/system.log`: no `opensalestax: engine /v1/calculate ok`
+    or `opensalestax: engine call failed` lines — the plugin's
+    only INFO/WARNING log sites — confirming
+    `QuoteTotalsTaxPlugin::beforeCollect` itself never entered.
+- **Root cause is now bounded to**: the plugin is registered against
+  the totals collector but `Magento\Tax\Model\Sales\Total\Quote\Tax::collect`
+  is never called for the test cart. The two leading hypotheses:
+  - Magento's `Quote::collectTotals()` is short-circuiting before
+    the totals chain dispatch (some pre-condition check on the
+    quote — perhaps the test's manually-constructed Quote +
+    Address objects don't satisfy `getAllAddresses()` or some
+    flag the dispatcher checks).
+  - The test bypasses the TotalsCollector entry that wraps
+    each totals model's collect call — perhaps because
+    `$quote->collectTotals()` in 2.4.7-p3 doesn't iterate the
+    same way our v0.1.0–v1.3.5 production code path on VM 914
+    did, and the test needs to drive
+    `TotalsCollector::collect($quote, $shippingAddress)` directly.
+- **What this release includes:**
+  - SCOPE_TYPE_DEFAULT config write (v1.3.11 fix; still correct).
+  - OST module deployed to `app/code/` (v1.3.12 attempt;
+    composer-installed-only didn't reliably wire `etc/di.xml`).
+  - Comprehensive `[MG-1-DIAG]` STDERR dump emitted right before
+    `$quote->collectTotals()` — module enable-state, engine URL
+    at each scope, totals interceptor class, plugin chain
+    registration, cart fixture state. Future regressions of any
+    of these diagnose themselves from the GitHub Actions log.
+  - Test fixture reverted from `simple` back to `virtual`
+    products — `simple` didn't unblock the issue either, and
+    `virtual` is what was last assumed to work (commit ba047b3).
+  - Workflow dumps `var/log/*.log` + sandbox `app/etc/config.php`
+    on failure for forensic continuity.
+- **Mg-1.3 task for the next subagent**: drive
+  `\Magento\Quote\Model\Quote\TotalsCollector::collect()` directly
+  (or its 2.4.7-p3 equivalent) from the test, OR write a tracer
+  plugin that proves whether `Tax::collect` is invoked at all,
+  OR check whether `@magentoAppIsolation enabled` is somehow
+  preventing the plugin chain from compiling for the second
+  test framework's ObjectManager pass.
+
+Module-byte change in this release: zero across v1.3.11 → v1.3.13.
+Only the integration test harness + CI workflow were touched; the
+merchant-facing module is unchanged from v1.3.10 (which itself
+shipped the v1.3.9 stub-module bootstrap guard).
+
 ## [1.3.12] - 2026-05-19
 
 ### Fixed

@@ -163,15 +163,11 @@ class LiveMagentoTaxTest extends TestCase
         // THE call. Drives the whole totals pipeline including our plugin.
         $quote->collectTotals();
 
-        // Mg-1.2: with simple products (now the test default — see comment
-        // in createFixtureProduct) Magento lands tax on the shipping
-        // address per the canonical totals path. Pre-Mg-1.2 the test
-        // used virtual products and read tax off billing; that path
-        // bypassed the shipping-assignment-based Tax\Model\Sales\Total\Quote\Tax::collect
-        // totals collector — exactly where our plugin is registered —
-        // so the engine never got hit. The whole canonical path is
-        // shipping-address-driven; switching back lets the plugin fire.
-        $taxAddress = $quote->getShippingAddress();
+        // For virtual products Magento applies the tax to the billing
+        // address (no shipping address for items with no weight). The
+        // same canonical-totals-write path runs for either - billing
+        // is just where the values land for virtual carts.
+        $taxAddress = $quote->getBillingAddress();
 
         // THE assertion. Single line. Would have caught Bugs C + D + E + F
         // in one shot at PR time.
@@ -344,28 +340,16 @@ class LiveMagentoTaxTest extends TestCase
 
     private function createFixtureProduct(): Product
     {
-        // Mg-1.2 (v1.3.13): use 'simple' products. Earlier the test used
-        // 'virtual' as a workaround for Magento OSS 2.4.7-p3's MSI DI bug
-        // (commit ba047b3); but virtual products skip the
-        // shipping-assignment-based totals collector path where our
-        // QuoteTotalsTaxPlugin is registered (target
-        // Magento\Tax\Model\Sales\Total\Quote\Tax::collect — only fires
-        // when there is a shipping_assignment, which a virtual quote
-        // doesn't produce). The Mg-1.1 stub module
-        // (EJOsterberg_OstaxTestStubs) short-circuits the MSI DI bug so
-        // simple products now work end-to-end in CI, matching the
-        // production code path on VM 914.
+        // Use a VIRTUAL product (Magento type 'virtual') rather than
+        // 'simple' — workaround for Magento OSS 2.4.7-p3's MSI DI bug.
+        // The 'simple' branch was tried in v1.3.13 and ALSO produced
+        // 0 tax; the failure mode is identical (plugin registered but
+        // Tax::collect never invoked), so product type isn't the
+        // blocker. Keeping 'virtual' avoids spinning up unrelated
+        // carrier DI surfaces for a test that doesn't need them.
         /** @var Product $product */
         $product = $this->objectManager->create(Product::class);
-        // Mg-1.2: switched from 'virtual' back to 'simple'. Virtual products
-        // skip the shipping-assignment-based totals path that registers our
-        // Tax\Model\Sales\Total\Quote\Tax::collect plugin, so the plugin
-        // never fires for a virtual cart. Production (VM 914) uses simple
-        // products and proved tax computation works. The Mg-1.1 stub
-        // module (EJOsterberg_OstaxTestStubs) short-circuits the
-        // multi-source-inventory geocoding DI bug that originally pushed
-        // us to virtual products in commit ba047b3.
-        $product->setTypeId('simple')
+        $product->setTypeId('virtual')
             ->setAttributeSetId(4)
             ->setName('OST Mg-1 Fixture Product')
             ->setSku('ostax-mn-fixture-' . uniqid())
@@ -448,16 +432,9 @@ class LiveMagentoTaxTest extends TestCase
 
         $quote->setShippingAddress($shippingAddress);
         $quote->setBillingAddress($billingAddress);
-
-        // Mg-1.2: with simple products the totals chain runs the
-        // shipping-assignment branch — which means it expects a
-        // shipping method on the address. Without one the assignment
-        // is still created (so our plugin fires) but Magento's
-        // grand_total roll-up adds the shipping_amount = 0 line.
-        // Pre-set a deterministic free-shipping method so the cart
-        // computes without trying to reach an external carrier.
-        $shippingAddress->setCollectShippingRates(true);
-        $shippingAddress->setShippingMethod('freeshipping_freeshipping');
+        // Virtual products skip shipping-rate collection; don't ask
+        // for it (avoids spinning up carrier DI surfaces unrelated to
+        // tax math).
 
         $cartRepository->save($quote);
 
