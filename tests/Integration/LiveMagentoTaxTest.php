@@ -254,24 +254,39 @@ class LiveMagentoTaxTest extends TestCase
         $totalsInterceptor   = $totalsTargetClass . '\\Interceptor';
         $interceptorLoadable = class_exists($totalsInterceptor);
         $pluginsForTarget    = [];
+        $pluginListClass     = null;
+        $pluginsRawSample    = null;
         if (interface_exists($pluginListInterface)) {
             /** @var \Magento\Framework\Interception\PluginListInterface $plugins */
             $plugins = $this->objectManager->get($pluginListInterface);
+            $pluginListClass = get_class($plugins);
             try {
-                // ::getNext returns next plugin instance for a given target+method.
-                // Walk every defined plugin name on the target class.
-                $reflect = new \ReflectionObject($plugins);
-                if ($reflect->hasMethod('getPlugins')) {
-                    $method = $reflect->getMethod('getPlugins');
-                    $method->setAccessible(true);
-                    $all = $method->invoke($plugins);
-                    if (is_array($all)) {
-                        foreach ($all as $key => $val) {
-                            if (is_string($key) && stripos($key, 'EJOsterberg') !== false) {
-                                $pluginsForTarget[$key] = is_array($val) ? array_keys($val) : (string)$val;
+                // Walk PluginList internals via reflection. The structure
+                // varies by Magento version; look for any property whose
+                // serialized JSON contains "EJOsterberg" (our vendor).
+                $reflect = new \ReflectionClass($plugins);
+                while ($reflect !== false) {
+                    foreach ($reflect->getProperties() as $prop) {
+                        $prop->setAccessible(true);
+                        $value = $prop->getValue($plugins);
+                        if (is_array($value)) {
+                            $json = json_encode($value);
+                            if (is_string($json) && stripos($json, 'EJOsterberg') !== false) {
+                                // Trim to a manageable chunk for the log.
+                                $pluginsRawSample = substr($json, 0, 1500);
+                                $pluginsForTarget[$prop->getName()] = true;
                             }
                         }
                     }
+                    $reflect = $reflect->getParentClass();
+                }
+                // Direct probe: ask the PluginList what plugins fire for
+                // our exact target+method. PluginListInterface::getNext
+                // returns the chain head; reflection walk above is the
+                // belt-and-braces for older Magento versions.
+                if (method_exists($plugins, 'getNext')) {
+                    $next = $plugins->getNext($totalsTargetClass, 'collect');
+                    $pluginsForTarget['__getNext_collect__'] = $next === null ? null : (array)$next;
                 }
             } catch (\Throwable $e) {
                 $pluginsForTarget = ['__error__' => $e->getMessage()];
@@ -301,7 +316,9 @@ class LiveMagentoTaxTest extends TestCase
             'shipping_postcode'   => $shipping ? (string)$shipping->getPostcode() : null,
             'totals_interceptor_loadable' => $interceptorLoadable,
             'totals_resolved_class'       => get_class($resolvedTotals),
+            'plugin_list_class'           => $pluginListClass,
             'ost_plugins_registered'      => $pluginsForTarget,
+            'plugins_raw_sample'          => $pluginsRawSample,
         ];
         fwrite(STDERR, "\n[MG-1-DIAG] " . json_encode($diag) . "\n");
     }
