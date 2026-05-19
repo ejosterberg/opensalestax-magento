@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.9] - 2026-05-19
+
 ### Fixed
 
 - **Mg-1 incubation test now actually arms (Mg-1.1).** Added a test-only
