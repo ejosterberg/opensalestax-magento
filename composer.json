@@ -19,7 +19,7 @@
         "phpunit/phpunit": "^10.5",
         "phpstan/phpstan": "^1.10",
         "bitexpert/phpstan-magento": "^0.31",
-        "magento/magento-coding-standard": "^32.0"
+        "magento/magento-coding-standard": "^40"
     },
     "autoload": {
         "psr-4": {
