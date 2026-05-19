@@ -102,12 +102,35 @@ class LiveMagentoTaxTest extends TestCase
      * overrides. Uses MutableScopeConfigInterface to avoid touching
      * core_config_data (which would require cache flushes and integration
      * test sandbox magic).
+     *
+     * Mg-1.2 (v1.3.11): writes at BOTH SCOPE_TYPE_DEFAULT (the convention
+     * vendor/magento/module-X/Test/Integration uses) AND SCOPE_STORE
+     * 'default' (the scope the merchant's admin save lands at). Earlier
+     * the test wrote ONLY at SCOPE_STORE 'default' — when the integration
+     * test framework's current-store resolution didn't match store code
+     * 'default' the plugin's `getValue(SCOPE_STORE, null)` read fell
+     * through to SCOPE_TYPE_DEFAULT, which was empty, and `isConfigured()`
+     * returned false → the `beforeCollect` gate short-circuited silently
+     * → engine never got hit → tax stayed at 0. CI evidence: mock engine
+     * stderr captured the `listen` event but never any `/v1/calculate`
+     * request.
      */
     private function configureOpenSalesTaxModule(): void
     {
         /** @var MutableScopeConfigInterface $config */
         $config = $this->objectManager->get(MutableScopeConfigInterface::class);
         $engineUrl = getenv('OSTAX_TEST_ENGINE_URL') ?: 'http://127.0.0.1:8080';
+
+        // Default-scope writes (the convention Magento's own integration
+        // tests use; survives any store-resolution quirk in the test
+        // harness because SCOPE_STORE reads fall through to default).
+        $config->setValue('osstax/general/api_url', $engineUrl, ScopeConfigInterface::SCOPE_TYPE_DEFAULT);
+        $config->setValue('osstax/general/fail_hard', '0', ScopeConfigInterface::SCOPE_TYPE_DEFAULT);
+        $config->setValue('osstax/general/restrict_to_public_ips', '0', ScopeConfigInterface::SCOPE_TYPE_DEFAULT);
+
+        // Belt-and-braces store-scope writes (so a store-scoped read with
+        // an explicit code 'default' also resolves; matches what the
+        // merchant admin save produces).
         $config->setValue('osstax/general/api_url', $engineUrl, ScopeInterface::SCOPE_STORE, 'default');
         $config->setValue('osstax/general/fail_hard', '0', ScopeInterface::SCOPE_STORE, 'default');
         $config->setValue('osstax/general/restrict_to_public_ips', '0', ScopeInterface::SCOPE_STORE, 'default');
@@ -129,6 +152,13 @@ class LiveMagentoTaxTest extends TestCase
 
         $product = $this->createFixtureProduct();
         $quote = $this->createMinnesotaQuote($product);
+
+        // Mg-1.2 diagnostic: dump the state the plugin sees right before
+        // collectTotals(). If the assertion fails downstream the workflow
+        // logs show whether the engine URL was visible to the plugin AND
+        // whether the OST module is enabled. Cheap to keep — turns silent
+        // "engine never got hit" failures into one-look diagnoses.
+        $this->dumpDiagnostics($quote);
 
         // THE call. Drives the whole totals pipeline including our plugin.
         $quote->collectTotals();
@@ -167,6 +197,70 @@ class LiveMagentoTaxTest extends TestCase
             0.01,
             'Grand total did not include the engine-computed tax.'
         );
+    }
+
+    /**
+     * Mg-1.2 (v1.3.11): emit a structured one-shot diagnostic block to
+     * STDERR right before `$quote->collectTotals()`. The block answers
+     * the questions that the v1.3.10 silent-zero-tax failure couldn't:
+     *
+     *  1. Is the OST module actually enabled in the test instance?
+     *  2. What does `ScopeConfigInterface::getValue` return for the engine
+     *     URL — at SCOPE_DEFAULT *and* at the cart's actual store?
+     *  3. What is the test cart's quote currency / address country / ZIP?
+     *
+     * Output goes to STDERR so it survives PHPUnit's stdout buffering and
+     * appears in the GitHub Actions log next to the PHPUnit FAILURE line.
+     */
+    private function dumpDiagnostics(Quote $quote): void
+    {
+        /** @var ScopeConfigInterface $scopeConfig */
+        $scopeConfig = $this->objectManager->get(ScopeConfigInterface::class);
+        /** @var StoreManagerInterface $storeManager */
+        $storeManager = $this->objectManager->get(StoreManagerInterface::class);
+
+        $store = $storeManager->getStore();
+        $currentStoreCode = $store->getCode();
+        $currentStoreId   = (int)$store->getId();
+
+        $apiUrlDefault = $scopeConfig->getValue('osstax/general/api_url', ScopeConfigInterface::SCOPE_TYPE_DEFAULT);
+        $apiUrlStore   = $scopeConfig->getValue('osstax/general/api_url', ScopeInterface::SCOPE_STORE, $currentStoreCode);
+        $apiUrlNullSc  = $scopeConfig->getValue('osstax/general/api_url', ScopeInterface::SCOPE_STORE);
+
+        // Module enabled? The integration framework's deploymentConfig
+        // tracks this in app/etc/config.php — read it via the runtime
+        // ModuleList interface so we don't shell out to `bin/magento`.
+        $moduleListInterface = 'Magento\\Framework\\Module\\ModuleListInterface';
+        $isOstModuleOn = false;
+        $isStubModuleOn = false;
+        if (interface_exists($moduleListInterface)) {
+            /** @var \Magento\Framework\Module\ModuleListInterface $moduleList */
+            $moduleList = $this->objectManager->get($moduleListInterface);
+            $isOstModuleOn  = $moduleList->has('EJOsterberg_OpenSalesTax');
+            $isStubModuleOn = $moduleList->has('EJOsterberg_OstaxTestStubs');
+        }
+
+        $billing = $quote->getBillingAddress();
+        $shipping = $quote->getShippingAddress();
+
+        $diag = [
+            'evt'                 => 'mg1_diag',
+            'module_ost_enabled'  => $isOstModuleOn,
+            'module_stub_enabled' => $isStubModuleOn,
+            'store_code'          => $currentStoreCode,
+            'store_id'            => $currentStoreId,
+            'api_url_at_default'  => $apiUrlDefault === null ? null : (string)$apiUrlDefault,
+            'api_url_at_store'    => $apiUrlStore === null ? null : (string)$apiUrlStore,
+            'api_url_at_store_null_code' => $apiUrlNullSc === null ? null : (string)$apiUrlNullSc,
+            'quote_currency'      => (string)$quote->getQuoteCurrencyCode(),
+            'quote_active'        => (bool)$quote->getIsActive(),
+            'quote_items_count'   => is_array($quote->getAllItems()) ? count($quote->getAllItems()) : 0,
+            'billing_country'     => $billing ? (string)$billing->getCountryId() : null,
+            'billing_postcode'    => $billing ? (string)$billing->getPostcode() : null,
+            'shipping_country'    => $shipping ? (string)$shipping->getCountryId() : null,
+            'shipping_postcode'   => $shipping ? (string)$shipping->getPostcode() : null,
+        ];
+        fwrite(STDERR, "\n[MG-1-DIAG] " . json_encode($diag) . "\n");
     }
 
     private function assertMockEngineReachable(): void

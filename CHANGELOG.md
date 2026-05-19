@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.11] - 2026-05-19
+
+### Fixed
+
+- **Mg-1.2 silent-zero-tax in CI integration test.** With v1.3.10's
+  `continue-on-error` removed, the live-Magento integration test surfaced
+  as red: `$address->getTaxAmount()` stayed at `0` and the mock OST
+  engine's stderr captured the `listen` event but never any
+  `/v1/calculate` request — the OST module's `beforeCollect` gate was
+  short-circuiting silently. Root cause: `LiveMagentoTaxTest::configureOpenSalesTaxModule()`
+  wrote the engine URL via `MutableScopeConfigInterface::setValue` at
+  `ScopeInterface::SCOPE_STORE` with store code `'default'` only.
+  Magento's integration test harness resolves `getValue(SCOPE_STORE, null)`
+  to the current-store context, which in the bootstrap path does NOT
+  always match the literal store code `'default'` — so the plugin's
+  `Config::isConfigured()` saw an empty URL → returned false →
+  `beforeCollect` returned the passthrough → engine never got hit →
+  tax stayed at 0. Fix: write the same three settings at
+  `ScopeConfigInterface::SCOPE_TYPE_DEFAULT` first (the convention every
+  `vendor/magento/module-X/Test/Integration/...` test uses), then keep
+  the existing store-scope writes as a belt-and-braces fallback. Also
+  adds a `dumpDiagnostics()` STDERR block emitted right before
+  `$quote->collectTotals()` — module enable-state + engine-URL value
+  as read by `ScopeConfigInterface::getValue` at each scope + cart
+  fixture currency/country/ZIP — so any future regression of this
+  shape diagnoses itself from the GitHub Actions log instead of
+  requiring another diagnose-by-subagent cycle.
+  Module-byte change in this release: zero. Only `tests/Integration/LiveMagentoTaxTest.php`
+  was edited; the merchant-facing module is unchanged from v1.3.10.
+
 ## [1.3.10] - 2026-05-19
 
 ### Fixed
