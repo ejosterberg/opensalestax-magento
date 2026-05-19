@@ -243,6 +243,46 @@ class LiveMagentoTaxTest extends TestCase
         $billing = $quote->getBillingAddress();
         $shipping = $quote->getShippingAddress();
 
+        // Did the DI compiler actually wire our plugin onto the totals
+        // collector? Magento generates Interceptor subclasses at runtime
+        // (in dev mode) — if the target class isn't loadable as an
+        // Interceptor, or the plugin reference isn't in
+        // \Magento\Framework\Interception\PluginListInterface for that
+        // target, then beforeCollect never fires regardless of any gate.
+        $pluginListInterface = 'Magento\\Framework\\Interception\\PluginListInterface';
+        $totalsTargetClass   = 'Magento\\Tax\\Model\\Sales\\Total\\Quote\\Tax';
+        $totalsInterceptor   = $totalsTargetClass . '\\Interceptor';
+        $interceptorLoadable = class_exists($totalsInterceptor);
+        $pluginsForTarget    = [];
+        if (interface_exists($pluginListInterface)) {
+            /** @var \Magento\Framework\Interception\PluginListInterface $plugins */
+            $plugins = $this->objectManager->get($pluginListInterface);
+            try {
+                // ::getNext returns next plugin instance for a given target+method.
+                // Walk every defined plugin name on the target class.
+                $reflect = new \ReflectionObject($plugins);
+                if ($reflect->hasMethod('getPlugins')) {
+                    $method = $reflect->getMethod('getPlugins');
+                    $method->setAccessible(true);
+                    $all = $method->invoke($plugins);
+                    if (is_array($all)) {
+                        foreach ($all as $key => $val) {
+                            if (is_string($key) && stripos($key, 'EJOsterberg') !== false) {
+                                $pluginsForTarget[$key] = is_array($val) ? array_keys($val) : (string)$val;
+                            }
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                $pluginsForTarget = ['__error__' => $e->getMessage()];
+            }
+        }
+
+        // Confirm the actual concrete class Magento resolved for the
+        // totals target — should be a *\Interceptor subclass once
+        // plugins are wired. If it's the bare class, no plugin runs.
+        $resolvedTotals = $this->objectManager->get($totalsTargetClass);
+
         $diag = [
             'evt'                 => 'mg1_diag',
             'module_ost_enabled'  => $isOstModuleOn,
@@ -259,6 +299,9 @@ class LiveMagentoTaxTest extends TestCase
             'billing_postcode'    => $billing ? (string)$billing->getPostcode() : null,
             'shipping_country'    => $shipping ? (string)$shipping->getCountryId() : null,
             'shipping_postcode'   => $shipping ? (string)$shipping->getPostcode() : null,
+            'totals_interceptor_loadable' => $interceptorLoadable,
+            'totals_resolved_class'       => get_class($resolvedTotals),
+            'ost_plugins_registered'      => $pluginsForTarget,
         ];
         fwrite(STDERR, "\n[MG-1-DIAG] " . json_encode($diag) . "\n");
     }
