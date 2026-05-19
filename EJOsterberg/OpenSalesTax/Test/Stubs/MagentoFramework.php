@@ -10,8 +10,26 @@
  *
  * These declarations live in `autoload-dev.files` of composer.json so they
  * are NOT bundled into the package merchants install.
+ *
+ * EARLY-EXIT GUARD (added v1.3.9 for Mg-1.1): If the real Magento framework
+ * is autoloadable, skip stub declaration entirely. Without this guard the
+ * stub fires during integration-test bootstrap (where this file is loaded
+ * via autoload-dev.files AT autoloader init, BEFORE Magento's PSR-4 lazy-
+ * resolve has touched any Magento\Framework class). Partial stubs - like
+ * the original Json class missing 3 inherited abstract methods - then
+ * crash class declaration when PHP later loads the real interface.
  */
 declare(strict_types=1);
+
+namespace {
+    // ComponentRegistrar is THE foundational Magento class. If it's
+    // loadable, we're running inside a real Magento install (integration
+    // test sandbox or merchant production), so all the stubs below are
+    // both unnecessary AND dangerous.
+    if (class_exists(\Magento\Framework\Component\ComponentRegistrar::class)) {
+        return;
+    }
+}
 
 namespace Magento\Framework {
     if (!class_exists(__NAMESPACE__ . '\\DataObject', false)) {
@@ -402,6 +420,12 @@ namespace Magento\Framework\Controller\Result {
          * Stub of Magento's JSON result type. The real class extends
          * AbstractResult and serializes to JSON via setData(). For unit-test
          * purposes only the symbol needs to resolve.
+         *
+         * Note: implements our local stub of ResultInterface (above) which
+         * is empty. In a real Magento install the file-level early-exit
+         * guard (top of file) skips this whole stub, so the real Magento
+         * Json (which extends AbstractResult and implements all 3 abstract
+         * ResultInterface methods) is what's actually used.
          */
         class Json implements \Magento\Framework\Controller\ResultInterface
         {

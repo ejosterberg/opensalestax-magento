@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.10] - 2026-05-19
+
+### Fixed
+
+- **Mg-1 unit-stub regression blocking integration test.** v1.3.8's
+  Test Connection button added `Magento\Framework\Controller\Result\Json`
+  to `Test/Stubs/MagentoFramework.php` as a stub class implementing
+  our local zero-method `ResultInterface` stub. The unit-test path is
+  unaffected, but the Magento CI integration test bootstrap loads the
+  stub file via `autoload-dev.files` BEFORE real Magento's PSR-4
+  resolves its own `Result\Json` - when real Magento later tries to
+  resolve the class it crashes because the stub already declared it
+  without the 3 abstract methods of real Magento's
+  `Magento\Framework\Controller\ResultInterface`
+  (`setHttpResponseCode`, `setHeader`, `renderResult`). Added a
+  file-level early-exit guard at the top of `MagentoFramework.php`:
+  if `\Magento\Framework\Component\ComponentRegistrar` is autoloadable
+  we're inside a real Magento install (CI sandbox or merchant prod)
+  and skip stub declarations entirely. Required for v1.3.9's Mg-1
+  arming to actually arm.
+
 ## [1.3.9] - 2026-05-19
 
 ### Fixed
