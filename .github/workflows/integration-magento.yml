@@ -212,11 +212,45 @@ jobs:
           composer config --no-interaction allow-plugins.magento/magento-composer-installer true
           composer config --no-interaction allow-plugins.magento/inventory-composer-installer true
 
-      - name: Register module as a path repository
-        working-directory: ${{ env.MAGENTO_DIR }}
+      - name: Deploy OST module into app/code (Mg-1.2)
+        # v1.3.11's diagnostic dump proved the OST module ends up
+        # "enabled" per ModuleListInterface when installed via composer
+        # path-repo into vendor/ — BUT the runtime PluginListInterface
+        # never sees its etc/di.xml plugin entries (ost_plugins_registered
+        # came back as []). Net effect: the totals collector Interceptor
+        # exists but has no plugins → beforeCollect never fires →
+        # engine never gets hit → tax stays at 0.
+        #
+        # Fix: deploy the module under app/code/EJOsterberg/OpenSalesTax
+        # — the same pattern used for the Mg-1.1 OstaxTestStubs stub
+        # module a few steps down. Magento's integration test bootstrap
+        # scans app/code/*/* AT INSTALL TIME for etc/module.xml + etc/di.xml
+        # and merges them into the freshly-generated app/etc/config.php
+        # + compiled plugin list. Composer-installed vendor modules
+        # don't always get the same treatment in the integration sandbox
+        # (the magento-composer-installer plugin runs at composer-install
+        # time, but the integration test framework re-bootstraps the
+        # config later and only the app/code scan is guaranteed to land).
+        #
+        # This is integration-test-only. Real merchants install via
+        # composer ("composer require ejosterberg/module-opensalestax"),
+        # which works against a normal Magento install where the
+        # post-install setup:upgrade pass picks up vendor/-installed
+        # modules. Our CI exercises the runtime tax flow, not the
+        # install-time mechanics.
         run: |
-          composer config repositories.opensalestax-local path "${{ github.workspace }}/opensalestax-magento"
-          composer require "ejosterberg/module-opensalestax:@dev" --no-update
+          OST_SRC="${{ github.workspace }}/opensalestax-magento/EJOsterberg/OpenSalesTax"
+          OST_DEST="${MAGENTO_DIR}/app/code/EJOsterberg/OpenSalesTax"
+          mkdir -p "${OST_DEST}"
+          cp -r "${OST_SRC}/." "${OST_DEST}/"
+          test -f "${OST_DEST}/registration.php" \
+            || { echo "OST module not deployed correctly"; ls -la "${OST_DEST}"; exit 1; }
+          test -f "${OST_DEST}/etc/di.xml" \
+            || { echo "OST etc/di.xml missing — plugin won't register"; exit 1; }
+          echo "=== OST module deployed to app/code ==="
+          ls -la "${OST_DEST}"
+          echo "=== etc/di.xml head ==="
+          head -50 "${OST_DEST}/etc/di.xml"
 
       - name: Install Mg-1.1 test-only DI override module
         # Drops EJOsterberg_OstaxTestStubs into app/code/ BEFORE composer
@@ -244,6 +278,14 @@ jobs:
         # Same retry rationale as the create-project step above:
         # the Mage-OS mirror sporadically returns HTTP 520. Composer's
         # own retry-once behavior isn't enough on a sustained outage.
+        #
+        # Mg-1.2: this step no longer composer-installs the OST module
+        # (we deploy it directly to app/code/ above). Vendor still gets
+        # populated with Magento's own ~700 modules; we just don't add
+        # ours to vendor/ to avoid a duplicate ComponentRegistrar
+        # registration (vendor/ + app/code/ both calling
+        # ComponentRegistrar::register('EJOsterberg_OpenSalesTax', ...)
+        # would throw LogicException at bootstrap).
         working-directory: ${{ env.MAGENTO_DIR }}
         run: |
           for attempt in 1 2 3; do
@@ -253,9 +295,10 @@ jobs:
             echo "composer install failed (attempt ${attempt}); waiting before retry"
             sleep $((attempt * 15))
           done
-          # Validate the module is actually installed.
-          test -f vendor/ejosterberg/module-opensalestax/EJOsterberg/OpenSalesTax/registration.php \
-            || { echo "Module install verification failed"; exit 1; }
+          # Validate the OST module is in app/code (deployed by the
+          # "Deploy OST module into app/code" step above).
+          test -f app/code/EJOsterberg/OpenSalesTax/registration.php \
+            || { echo "OST module missing from app/code"; exit 1; }
 
       - name: Configure integration test framework
         working-directory: ${{ env.MAGENTO_DIR }}/dev/tests/integration

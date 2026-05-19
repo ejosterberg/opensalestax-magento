@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.12] - 2026-05-19
+
+### Fixed
+
+- **Mg-1.2 follow-up: OST module deployed to app/code so its di.xml
+  reaches the runtime PluginListInterface.** v1.3.11's first CI run
+  proved the SCOPE_TYPE_DEFAULT fix landed cleanly — but the test was
+  still red, and the v1.3.11 [MG-1-DIAG] STDERR dump revealed why:
+  the OST module was reported as enabled (per `ModuleListInterface`),
+  the totals collector's `*\Interceptor` subclass loaded, store +
+  cart + currency + ZIP all checked out — yet `ost_plugins_registered`
+  came back as an empty array. In other words, Magento's runtime
+  `PluginListInterface` had zero EJOsterberg plugins on
+  `Magento\Tax\Model\Sales\Total\Quote\Tax`, so `beforeCollect`
+  could not fire regardless of any other gate.
+  Root cause: the integration test framework re-bootstraps Magento's
+  config (`app/etc/config.php` + compiled DI) after composer install,
+  scanning `app/code/*/*` for `etc/module.xml`+`etc/di.xml`. Vendor
+  modules ARE registered via `ComponentRegistrar` and ARE recognized
+  as enabled, but their `etc/di.xml` doesn't always make it into the
+  re-generated plugin list (`magento-composer-installer` runs at
+  composer-install time; the post-install test-framework reboot drops
+  it). Real merchants don't hit this because `bin/magento setup:upgrade`
+  picks vendor modules up reliably on a normal install; only this
+  sandbox is affected.
+  Fix: deploy the OST module to `$MAGENTO_DIR/app/code/EJOsterberg/OpenSalesTax/`
+  in the workflow (same pattern as the Mg-1.1 `OstaxTestStubs` stub
+  module), and drop the `composer require ejosterberg/module-opensalestax`
+  step that previously placed it under `vendor/`. Without removing
+  the composer registration we'd hit `LogicException` from a duplicate
+  `ComponentRegistrar::register('EJOsterberg_OpenSalesTax', ...)`
+  call. Module-byte change: zero. Only `.github/workflows/integration-magento.yml`
+  and `CHANGELOG.md` edited.
+
 ## [1.3.11] - 2026-05-19
 
 ### Fixed
