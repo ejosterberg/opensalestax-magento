@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<!-- SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later -->
+<!--
+    Mg-1.1 DI override.
+
+    Maps Magento\InventoryDistanceBasedSourceSelectionApi\Api\GetLatsLngsFromAddressInterface
+    to our no-op stub.
+
+    Upstream Magento OSS 2.4.6-p10 / 2.4.7-p3 wire this interface to the
+    real GetLatsLngsFromAddress concrete (in the InventoryDistanceBasedSourceSelection
+    module, NOT the Api module), which in turn depends on
+    GetGeoCodesForAddress whose ctor declares ClientInterface but DI hands
+    it Curl - PHP strict typing throws. The error surfaces as:
+
+        Cannot instantiate interface
+        Magento\InventoryDistanceBasedSourceSelectionApi\Api\GetLatsLngsFromAddressInterface
+
+    ...when ObjectManager tries to walk the resolution chain at
+    $quote->collectTotals() time.
+
+    The no-op stub returns an empty lat/lng list, which is a legal
+    "no geocoding data available" response per the interface contract.
+    Our OST tax-calculation plugin doesn't touch MSI source-selection
+    at all, so this short-circuit is loss-less for the Mg-1 assertion.
+
+    Because module.xml declares <sequence>Magento_InventoryDistanceBasedSourceSelectionApi</sequence>
+    this di.xml loads AFTER the upstream Api module's di.xml, so our
+    preference wins via Magento's standard last-write-wins DI merge.
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <preference for="Magento\InventoryDistanceBasedSourceSelectionApi\Api\GetLatsLngsFromAddressInterface"
+                type="EJOsterberg\OstaxTestStubs\Stubs\GetLatsLngsFromAddressInterfaceStub"/>
+</config>

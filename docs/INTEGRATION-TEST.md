@@ -4,33 +4,43 @@ This is the operator's reference for the integration test that closes the
 gap exposed by the v1.3.0 -> v1.3.5 six-bug evening (May 2026). See
 `CHANGELOG.md` for the full post-mortem.
 
-## Status (v1.3.6)
+## Status (v1.3.9)
 
-**Incubation mode.** The workflow runs on every PR + push to main but
-is `continue-on-error: true` because two upstream Magento OSS issues
-block end-to-end green:
-
-- **2.4.7-p3**: DI bug in `InventoryDistanceBasedSourceSelectionApi`
-  (`Cannot instantiate interface GetLatsLngsFromAddressInterface`).
-  Affects any quote save that touches inventory.
-- **2.4.6-p10**: composer conflict (`sebastian/comparator <=4.0.6`
-  constraint vs `phpunit ^9.5` requiring `^4.0.10`).
-
-Both are upstream issues, not regressions in this module. When v1.4.x
-picks up matrix expansion, the path forward is one of:
-
-1. Wait for Adobe to ship a fix (2.4.7-p4 or 2.4.6-p11).
-2. Apply a virtual-product fixture (already in `LiveMagentoTaxTest`)
-   plus an explicit DI override for `GetLatsLngsFromAddressInterface`.
-3. Move the integration test framework off `dev/tests/integration` to
-   a leaner harness (e.g., `mage-os/github-actions/integration` once
-   they ship one — track at https://github.com/mage-os/github-actions).
-
-The infrastructure underneath is solid: mock OST engine + Magento
-project create + composer install + ObjectManager bootstrap + test
-discovery all succeed. The Mg-1 assertion (`$address->getTaxAmount() > 0`)
+**Armed.** The Mg-1 assertion (`$address->getTaxAmount() > 0`) now
 runs against the real Magento Interceptor/DI/canonical-totals-write
-path the moment one of the above three options unblocks the harness.
+path on every PR + push to main. `continue-on-error` is OFF — a
+failure in this workflow fails CI for real.
+
+The upstream Magento OSS 2.4.7-p3 DI bug
+(`Cannot instantiate interface GetLatsLngsFromAddressInterface`)
+that previously blocked `$quote->collectTotals()` is short-circuited
+by a test-only Magento module living at
+`tests/Integration/test-module/` (deployed into
+`$MAGENTO_DIR/app/code/EJOsterberg/OstaxTestStubs/` by the workflow
+before `composer install`). The module maps the broken interface to
+a no-op stub class returning an empty lat/lng list — a legal contract
+response per the interface PHPDoc, and loss-less for the OST plugin's
+actual surface (we calculate tax on the cart, not allocate stock).
+
+### Matrix scope
+
+Current matrix: Magento 2.4.7-p3 / PHP 8.2 only. Magento 2.4.6-p10
+remains parked behind its `sebastian/comparator` composer conflict
+(`<=4.0.6` vs `phpunit ^9.5`'s `^4.0.10`). v1.4.x will add 2.4.6-p10
+back via a parallel composer-override treatment — track at portfolio
+improvement-queue Mg-1.
+
+### When to remove the DI override
+
+When either:
+
+1. Adobe ships a Magento OSS patch that fixes the underlying DI
+   resolution chain (2.4.7-p4 or later). Delete
+   `tests/Integration/test-module/` + the workflow's "Install Mg-1.1
+   test-only DI override module" step.
+2. We migrate to a leaner integration harness off
+   `dev/tests/integration` that doesn't trigger MSI source-selection
+   at totals-collection time (improvement-queue Mg-1.2).
 
 ## What it tests
 

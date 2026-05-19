@@ -56,5 +56,18 @@
         },
         "sort-packages": true
     },
+    "archive": {
+        "exclude": [
+            "/tests",
+            "/docs",
+            "/specs",
+            "/kickoff-archive",
+            "/.github",
+            "/phpcs.xml",
+            "/phpstan.neon",
+            "/phpunit.xml.dist",
+            "/sonar-project.properties"
+        ]
+    },
     "minimum-stability": "stable"
 }

@@ -46,36 +46,37 @@ jobs:
     name: Live Magento ${{ matrix.magento }} / PHP ${{ matrix.php }}
     runs-on: ubuntu-latest
     timeout-minutes: 25  # hard ceiling - see budget above
-    # INCUBATION MODE (v1.3.6). The workflow's infrastructure works
-    # end-to-end (mock engine + composer + Magento install + ObjectManager
-    # boot + test discovery), but Magento OSS itself has version-specific
-    # CI friction points unrelated to our module:
-    #   - 2.4.7-p3: DI bug in InventoryDistanceBasedSourceSelectionApi
-    #     (Cannot instantiate interface GetLatsLngsFromAddressInterface)
-    #   - 2.4.6-p10: composer conflict (sebastian/comparator <=4.0.6 vs
-    #     phpunit/^9.5 needing ^4.0.10)
-    # Until one of those gets a clean workaround, the job is set to
-    # continue-on-error so a red badge here doesn't block legitimate
-    # PRs. The job IS still useful: failure output captures regressions
-    # in the workflow plumbing itself, and the test file gets exercised
-    # under PHPUnit's lint pass even when the Magento bootstrap can't
-    # complete.
-    continue-on-error: true
+    # v1.3.9 (Mg-1.1) ARMED the assertion. The Magento OSS 2.4.7-p3 DI
+    # bug ("Cannot instantiate interface GetLatsLngsFromAddressInterface")
+    # that previously blocked $quote->collectTotals() is short-circuited
+    # by the EJOsterberg_OstaxTestStubs test-only module installed at
+    # tests/Integration/test-module/ (copied into $MAGENTO_DIR/app/code/
+    # before composer install). The module declares a DI preference
+    # mapping the broken interface to a no-op stub returning an empty
+    # lat/lng list - a legal contract response per the interface PHPDoc.
+    # The Mg-1 assertion ($address->getTaxAmount() > 0) now runs against
+    # the real Magento Interceptor + DI + canonical-totals-write surface
+    # the moment $quote->collectTotals() executes. The 2.4.6-p10 composer
+    # conflict is still a separate matter: when that Magento version is
+    # added back to the matrix in v1.4.x, the same kind of test-only
+    # composer override may be needed - but the current 2.4.7-p3 matrix
+    # entry doesn't hit it.
     strategy:
       fail-fast: false
       matrix:
         # First-cut matrix: single Magento + PHP combo to keep wall-clock
-        # reasonable. Expand to 2.4.5 / 2.4.7 in v1.4.x once the baseline
-        # is reliably green - see CHANGELOG entry for v1.3.6.
+        # reasonable. Expand to 2.4.5 / 2.4.6 in v1.4.x once the baseline
+        # is reliably green - see CHANGELOG entries for v1.3.6 and v1.3.9.
         include:
-          # Magento 2.4.6-p10 hits a sebastian/comparator constraint
-          # conflict; 2.4.7-p3 hits an InventoryDistanceBasedSourceSelectionApi
-          # DI bug. Both are upstream Magento issues, not regressions
-          # in this module. The workflow runs to its actionable failure
-          # so the failure mode is documented in CI logs for whoever
-          # picks up the matrix-expansion work in v1.4.x.
+          # Magento 2.4.7-p3 - the version the v1.3.6 incubation work
+          # targeted. The Mg-1.1 DI override (test-module under
+          # tests/Integration/test-module/) covers the upstream
+          # GetLatsLngsFromAddressInterface DI bug. 2.4.6-p10 hits a
+          # separate sebastian/comparator constraint conflict; bringing
+          # it back into the matrix requires a parallel composer-override
+          # treatment and is deferred to v1.4.x.
           - php: "8.2"
-            magento: "2.4.6-p10"
+            magento: "2.4.7-p3"
 
     services:
       # Magento setup:install needs MySQL 8 (2.4.7-p3) + OpenSearch 2.x
@@ -216,6 +217,28 @@ jobs:
         run: |
           composer config repositories.opensalestax-local path "${{ github.workspace }}/opensalestax-magento"
           composer require "ejosterberg/module-opensalestax:@dev" --no-update
+
+      - name: Install Mg-1.1 test-only DI override module
+        # Drops EJOsterberg_OstaxTestStubs into app/code/ BEFORE composer
+        # install so Magento's PSR-0 autoloader (which maps app/code/ for
+        # any vendor) picks up the stub class at autoloader generation
+        # time. The module declares a DI preference mapping the broken
+        # Magento\InventoryDistanceBasedSourceSelectionApi\Api\GetLatsLngsFromAddressInterface
+        # to a no-op stub - works around the Magento OSS 2.4.7-p3 DI bug
+        # that previously crashed $quote->collectTotals().
+        # See tests/Integration/test-module/README.md for details.
+        run: |
+          STUB_SRC="${{ github.workspace }}/opensalestax-magento/tests/Integration/test-module"
+          STUB_DEST="${MAGENTO_DIR}/app/code/EJOsterberg/OstaxTestStubs"
+          mkdir -p "${STUB_DEST}"
+          cp -r "${STUB_SRC}/." "${STUB_DEST}/"
+          test -f "${STUB_DEST}/registration.php" \
+            || { echo "Test stub module not deployed correctly"; ls -la "${STUB_DEST}"; exit 1; }
+          # Drop the source-tree README - it's irrelevant inside the Magento install.
+          rm -f "${STUB_DEST}/README.md"
+          echo "=== Mg-1.1 test stub module deployed ==="
+          ls -la "${STUB_DEST}"
+          find "${STUB_DEST}" -type f
 
       - name: Install Magento dependencies (composer install)
         # Same retry rationale as the create-project step above:

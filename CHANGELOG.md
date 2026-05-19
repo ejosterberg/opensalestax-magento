@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Mg-1 incubation test now actually arms (Mg-1.1).** Added a test-only
+  Magento module at `tests/Integration/test-module/` (deployed by the
+  `integration-magento.yml` workflow into
+  `$MAGENTO_DIR/app/code/EJOsterberg/OstaxTestStubs/` before
+  `composer install`) that ships a DI preference mapping
+  `Magento\InventoryDistanceBasedSourceSelectionApi\Api\GetLatsLngsFromAddressInterface`
+  to a no-op stub returning an empty lat/lng list. Short-circuits the
+  upstream Magento OSS 2.4.7-p3 DI bug that was crashing
+  `$quote->collectTotals()` whenever the multi-source-inventory geocoding
+  branch ran. Workflow matrix flipped from 2.4.6-p10 (composer conflict,
+  separate issue) back to 2.4.7-p3 (the version the v1.3.6 incubation
+  work originally targeted). `continue-on-error: true` removed from the
+  workflow — the Mg-1 assertion (`$address->getTaxAmount() > 0`) now
+  fails CI for real if the OST module breaks Magento's cart-total flow.
+  Closes the primary v1.3.6 incubation gap. Merchant-facing module
+  bytes unchanged; the test stub module lives only under
+  `tests/Integration/` and is excluded from the composer package.
+
 ## [1.3.8] - 2026-05-19
 
 ### Added

@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<!-- SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later -->
+<!--
+    Mg-1.1 test-only Magento module: ships the DI preference that
+    short-circuits Magento OSS 2.4.6-p10 / 2.4.7-p3's broken
+    multi-source-inventory geocoding branch during the
+    LiveMagentoTaxTest integration test.
+
+    This module is NOT shipped to merchants. It is copied into
+    $MAGENTO_DIR/app/code/EJOsterberg/OstaxTestStubs/ by the
+    integration-magento.yml workflow before composer install.
+
+    The dependency on InventoryDistanceBasedSourceSelectionApi
+    ensures our preference overrides the upstream API module's
+    preference (which points at the broken concrete class).
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Module/etc/module.xsd">
+    <module name="EJOsterberg_OstaxTestStubs">
+        <sequence>
+            <module name="Magento_InventoryDistanceBasedSourceSelectionApi"/>
+        </sequence>
+    </module>
+</config>
