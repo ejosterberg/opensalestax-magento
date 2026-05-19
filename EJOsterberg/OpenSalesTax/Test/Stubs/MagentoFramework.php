@@ -361,6 +361,157 @@ namespace Magento\Framework\Exception {
     }
 }
 
+namespace Magento\Framework\Controller {
+    if (!interface_exists(__NAMESPACE__ . '\\ResultInterface', false)) {
+        /**
+         * Stub of Magento's controller result-interface. Returned by every
+         * adminhtml controller's execute(). We only need the type to exist
+         * for parameter / return-type hints.
+         */
+        interface ResultInterface
+        {
+        }
+    }
+    if (!class_exists(__NAMESPACE__ . '\\ResultFactory', false)) {
+        /**
+         * Stub of Magento's controller ResultFactory. Real implementation
+         * is provided to controllers via the App\Action base class. We
+         * only need the TYPE_JSON constant + a create() method signature.
+         */
+        class ResultFactory
+        {
+            public const TYPE_JSON = 'json';
+            public const TYPE_RAW = 'raw';
+
+            public function create(string $type): ResultInterface
+            {
+                return new class implements ResultInterface {
+                    public function setData(mixed $data): self
+                    {
+                        return $this;
+                    }
+                };
+            }
+        }
+    }
+}
+
+namespace Magento\Framework\Controller\Result {
+    if (!class_exists(__NAMESPACE__ . '\\Json', false)) {
+        /**
+         * Stub of Magento's JSON result type. The real class extends
+         * AbstractResult and serializes to JSON via setData(). For unit-test
+         * purposes only the symbol needs to resolve.
+         */
+        class Json implements \Magento\Framework\Controller\ResultInterface
+        {
+            public function setData(mixed $data): self
+            {
+                return $this;
+            }
+        }
+    }
+}
+
+namespace Magento\Backend\App\Action {
+    if (!class_exists(__NAMESPACE__ . '\\Context', false)) {
+        /**
+         * Stub of Magento's Backend\App\Action\Context. Real class wires
+         * the request/response/session/url/eventManager/auth surfaces an
+         * adminhtml controller needs. Type-only stub for unit tests.
+         */
+        class Context
+        {
+        }
+    }
+}
+
+namespace Magento\Backend\App {
+    if (!class_exists(__NAMESPACE__ . '\\Action', false)) {
+        /**
+         * Stub of Magento's Backend\App\Action base. Real class extends
+         * Framework\App\Action\Action and adds ACL + admin-context.
+         * Type-only stub; subclasses' execute() is exercised at runtime.
+         */
+        abstract class Action
+        {
+            protected \Magento\Framework\Controller\ResultFactory $resultFactory;
+
+            public function __construct(Action\Context $context)
+            {
+                $this->resultFactory = new \Magento\Framework\Controller\ResultFactory();
+            }
+
+            abstract public function execute();
+        }
+    }
+}
+
+namespace Magento\Backend\Block\Template {
+    if (!class_exists(__NAMESPACE__ . '\\Context', false)) {
+        /**
+         * Stub of Magento's Backend\Block\Template\Context. Real class
+         * wires the URL builder + escaper + store manager etc. Type-only.
+         */
+        class Context
+        {
+        }
+    }
+}
+
+namespace Magento\Framework\Data\Form\Element {
+    if (!class_exists(__NAMESPACE__ . '\\AbstractElement', false)) {
+        /**
+         * Stub of Magento's form-element base. system.xml custom fields
+         * receive one of these in `_getElementHtml($element)`. Type-only.
+         */
+        class AbstractElement
+        {
+        }
+    }
+}
+
+namespace Magento\Config\Block\System\Config\Form {
+    if (!class_exists(__NAMESPACE__ . '\\Field', false)) {
+        /**
+         * Stub of Magento's system-config field base. Custom field
+         * renderers extend this and override `_getElementHtml`. The
+         * real base inherits from AbstractBlock and exposes
+         * getUrl / escapeUrl / escapeHtml; we stub those minimally.
+         */
+        class Field
+        {
+            /** @param array<string, mixed> $data */
+            public function __construct(
+                \Magento\Backend\Block\Template\Context $context,
+                array $data = []
+            ) {
+            }
+
+            /** @param array<string, mixed> $params */
+            public function getUrl(string $route, array $params = []): string
+            {
+                return '/' . $route;
+            }
+
+            public function escapeUrl(string $url): string
+            {
+                return $url;
+            }
+
+            public function escapeHtml(mixed $text): string
+            {
+                return (string)$text;
+            }
+
+            protected function _getElementHtml(\Magento\Framework\Data\Form\Element\AbstractElement $element): string
+            {
+                return '';
+            }
+        }
+    }
+}
+
 namespace {
     if (!function_exists('__')) {
         /**

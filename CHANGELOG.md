@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.8] - 2026-05-19
+
+### Added
+
+- **Test Connection admin button (CP-4).** New button in Stores → Configuration
+  → Sales → Tax → OpenSalesTax → General that hits the configured engine's
+  `/v1/health` endpoint and displays the response inline ("✓ Engine v0.59.0
+  reachable — database connected (RTT 42 ms)" on success, "✗ HTTP 500" or
+  similar on failure). Surfaces typo'd engine URLs + unreachable engines at
+  config time rather than at first checkout. Brings this connector in line
+  with WooCom v0.5, Vendure v1.3, and Saleor v1.0 which already shipped this.
+  Wired via:
+  - `Model\ConnectionTester` — pure service object (testable in isolation;
+    delegates the actual probe to the existing `OstaxClient::healthCheck()`).
+  - `Controller\Adminhtml\Connection\Test` — thin adminhtml controller
+    returning JSON via Magento's `ResultFactory`; ACL-gated to
+    `EJOsterberg_OpenSalesTax::config` (same resource as the settings page).
+  - `Block\Adminhtml\Form\Field\TestButton` — `frontend_model` renderer for
+    the system.xml `<field id="test_connection">` button.
+  - `view/adminhtml/web/js/test-connection.js` — small jQuery click handler
+    loaded via `view/adminhtml/layout/adminhtml_system_config_edit.xml`.
+  - 5 unit tests exercising the service across happy-path, db-disconnected,
+    HTTP-failure, unconfigured-engine, and malformed-response shapes.
+
 ### Fixed (Mg-1 incubation harness, CI-only)
 
 Six follow-up commits to the v1.3.6 Mg-1 workflow + test, landed on `main`

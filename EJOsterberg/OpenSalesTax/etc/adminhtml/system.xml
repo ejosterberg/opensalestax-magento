@@ -30,6 +30,11 @@
                     <comment><![CDATA[If Yes, two defenses activate. At save time, the Engine API URL must resolve to a public IP â€” RFC 1918 / loopback / link-local / reserved ranges are rejected. The resolved IP is then <b>pinned</b>: subsequent engine calls dial that IP via cURL <code>CURLOPT_RESOLVE</code> regardless of what DNS returns, defending against DNS rebinding. If your engine's IP rotates, you must re-save the URL to refresh the pin. If No (default), localhost / RFC1918 / link-local hosts are permitted â€” the supported pattern when Magento and OST run on the same VM.]]></comment>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
+                <field id="test_connection" translate="label comment" type="button" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Test Connection</label>
+                    <frontend_model>EJOsterberg\OpenSalesTax\Block\Adminhtml\Form\Field\TestButton</frontend_model>
+                    <comment><![CDATA[Probe the configured engine's <code>/v1/health</code> endpoint and display the response inline. <b>Save the section first</b> so the URL above is persisted before testing.]]></comment>
+                </field>
             </group>
             <group id="category_mapping" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
                 <label>Category Mapping</label>

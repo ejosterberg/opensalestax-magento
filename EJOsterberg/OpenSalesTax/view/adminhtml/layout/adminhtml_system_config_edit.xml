@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<!--
+  ~ SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
+  ~
+  ~ Layout XML for the admin Stores → Configuration page. Loads the JS that
+  ~ wires the "Test Connection" button rendered by
+  ~ Block\Adminhtml\Form\Field\TestButton. Scoped to the system_config_edit
+  ~ handle so the script only loads on the settings page, not every admin page.
+  -->
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <head>
+        <script src="EJOsterberg_OpenSalesTax::js/test-connection.js"/>
+    </head>
+</page>

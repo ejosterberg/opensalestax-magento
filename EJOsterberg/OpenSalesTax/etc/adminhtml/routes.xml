@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<!-- SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later -->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:App/etc/routes.xsd">
+    <router id="admin">
+        <route id="opensalestax" frontName="opensalestax">
+            <module name="EJOsterberg_OpenSalesTax" before="Magento_Backend"/>
+        </route>
+    </router>
+</config>
